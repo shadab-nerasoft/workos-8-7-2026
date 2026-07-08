@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MessageText1, Paperclip2 } from "iconsax-react";
+import { ArrowDown2, MessageText1, Paperclip2 } from "iconsax-react";
 import { PriorityBadge } from "@/src/components/ui/badge";
 import { useAuthStore, useTaskStore } from "@/src/store";
 import { formatDate, titleCase } from "@/src/lib/utils/format";
@@ -30,7 +30,15 @@ const statusOptions: { value: TaskStatus; label: string }[] = [
   { value: "completed", label: "Completed" },
 ];
 
-export function KanbanBoard({ tasks, users }: { tasks: Task[]; users: User[] }) {
+export function KanbanBoard({
+  tasks,
+  users,
+  onTaskSelect,
+}: {
+  tasks: Task[];
+  users: User[];
+  onTaskSelect?: (task: Task) => void;
+}) {
   const [items, setItems] = useState(tasks);
   const [activeId, setActiveId] = useState<string | null>(null);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -155,6 +163,7 @@ export function KanbanBoard({ tasks, users }: { tasks: Task[]; users: User[] }) 
             tasks={group.tasks}
             usersById={usersById}
             onStatusChange={updateTaskStatus}
+            onTaskSelect={onTaskSelect}
           />
         ))}
       </div>
@@ -172,11 +181,13 @@ function KanbanColumn({
   tasks,
   usersById,
   onStatusChange,
+  onTaskSelect,
 }: {
   status: TaskStatus;
   tasks: Task[];
   usersById: Map<string, User>;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onTaskSelect?: (task: Task) => void;
 }) {
   return (
     <SortableContext id={status} items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -194,6 +205,7 @@ function KanbanColumn({
               task={task}
               assignee={usersById.get(task.assigneeId)}
               onStatusChange={onStatusChange}
+              onTaskSelect={onTaskSelect}
             />
           ))}
           {tasks.length === 0 && (
@@ -211,10 +223,12 @@ function TaskCard({
   task,
   assignee,
   onStatusChange,
+  onTaskSelect,
 }: {
   task: Task;
   assignee?: User;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onTaskSelect?: (task: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = {
@@ -229,6 +243,7 @@ function TaskCard({
       style={style}
       {...attributes}
       {...listeners}
+      onClick={() => onTaskSelect?.(task)}
       className="cursor-grab rounded-2xl border border-primary-200/70 bg-white p-4 shadow-sm outline-none ring-1 ring-transparent transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md focus:ring-2 focus:ring-primary-500 active:cursor-grabbing"
     >
       <TaskCardContent task={task} assignee={assignee} onStatusChange={onStatusChange} />
@@ -274,7 +289,13 @@ function TaskCardContent({
                 </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2 text-[10px] text-primary-500">⌄</span>
+            <ArrowDown2
+              size={12}
+              color="currentColor"
+              variant="Outline"
+              aria-hidden="true"
+              className="pointer-events-none absolute right-2 text-primary-500"
+            />
           </label>
         ) : (
           <span className="rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">

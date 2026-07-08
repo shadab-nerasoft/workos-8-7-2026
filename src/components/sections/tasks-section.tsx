@@ -1,55 +1,109 @@
 "use client";
 
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { KanbanBoard } from "@/src/components/ui/kanban-board";
-import { useAuthStore, useTaskStore, useEmployeeStore } from "@/src/store";
+import { TaskModal } from "@/src/components/projects/task-modal";
+import { useAuthStore, useTaskStore, useEmployeeStore, useProjectStore } from "@/src/store";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Add } from "iconsax-react";
+import type { Task } from "@/src/types";
 
 export function TasksSection() {
   const { currentUser } = useAuthStore();
   const allTasks = useTaskStore((s) => s.getAllTasks());
   const allUsers = useEmployeeStore((s) => s.getAllUsers());
-  
+  const allProjects = useProjectStore((s) => s.getAllProjects());
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  const visibleTasks = useMemo(() => {
+    if (!currentUser) {
+      return [];
+    }
+
+    if (currentUser.role === "manager") {
+      const teamMembers = allUsers.filter((user) => user.teamId === currentUser.teamId).map((user) => user.id);
+      return allTasks.filter((task) => teamMembers.includes(task.assigneeId));
+    }
+
+    if (currentUser.role === "employee") {
+      return allTasks.filter((task) => task.assigneeId === currentUser.id);
+    }
+
+    return allTasks;
+  }, [allTasks, allUsers, currentUser]);
+
+  const availableProjects = useMemo(() => {
+    if (!currentUser) {
+      return [];
+    }
+
+    if (currentUser.role === "manager") {
+      return allProjects.filter((project) => project.teamId === currentUser.teamId);
+    }
+
+    if (currentUser.role === "admin") {
+      return allProjects;
+    }
+
+    const assignedProjectIds = new Set(visibleTasks.map((task) => task.projectId));
+    const assignedProjects = allProjects.filter((project) => assignedProjectIds.has(project.id));
+
+    return assignedProjects.length > 0 ? assignedProjects : allProjects;
+  }, [allProjects, currentUser, visibleTasks]);
+
   if (!currentUser) return null;
 
-  // Filter tasks based on role:
-  // Admin/Manager: all tasks for projects they care about (for simplicity, we'll show all tasks for Admin, team tasks for Manager)
-  // Employee: only assigned tasks
-  let visibleTasks = allTasks;
-  
-  if (currentUser.role === "manager") {
-    const teamMembers = allUsers.filter(u => u.teamId === currentUser.teamId).map(u => u.id);
-    visibleTasks = allTasks.filter(t => teamMembers.includes(t.assigneeId));
-  } else if (currentUser.role === "employee") {
-    visibleTasks = allTasks.filter(t => t.assigneeId === currentUser.id);
-  }
+  const defaultProjectId = availableProjects[0]?.id;
+  const modalProjectId = editingTask?.projectId ?? defaultProjectId;
+
+  const openCreateModal = () => {
+    setEditingTask(null);
+    setIsCreateModalOpen(true);
+  };
+
+  const openEditModal = (task: Task) => {
+    setEditingTask(task);
+    setIsCreateModalOpen(true);
+  };
 
   const createButton = (
     <div className="-mt-16 mb-8 flex justify-end sm:-mt-20">
-      <Link
-        href="/daily-report"
+      <button
+        type="button"
+        onClick={openCreateModal}
+        disabled={!defaultProjectId}
         className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         <Add size={18} color="currentColor" />
         Create Task
-      </Link>
+      </button>
     </div>
   );
 
-  if (visibleTasks.length === 0) {
-    return (
-      <>
-        {createButton}
-        <EmptyState title="No tasks found" message="There are no tasks available in your current view." />
-      </>
-    );
-  }
+  const taskModal = modalProjectId ? (
+    <TaskModal
+      isOpen={isCreateModalOpen}
+      onClose={() => {
+        setIsCreateModalOpen(false);
+        setEditingTask(null);
+      }}
+      task={editingTask}
+      projectId={modalProjectId}
+    />
+  ) : null;
+
+  const content = visibleTasks.length === 0 ? (
+    <EmptyState title="No tasks found" message="There are no tasks available in your current view." />
+  ) : (
+    <KanbanBoard tasks={visibleTasks} users={allUsers} onTaskSelect={openEditModal} />
+  );
 
   return (
     <>
       {createButton}
-      <KanbanBoard tasks={visibleTasks} users={allUsers} />
+      {content}
+      {taskModal}
     </>
   );
 }
