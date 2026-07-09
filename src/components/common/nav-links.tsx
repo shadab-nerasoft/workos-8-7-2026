@@ -31,28 +31,38 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
     ];
 
     if (!isEmployee) {
-      items.push({ href: "/team-tasks", label: "Team Tasks", icon: TaskSquare });
+      items.push({
+        href: "/team-tasks",
+        label: "Team Tasks",
+        icon: TaskSquare,
+      });
     }
 
     if (isEmployee) {
       items.push(
         { href: "/daily-report", label: "Daily Report", icon: CalendarTick },
-        { href: "/reports", label: "My Reports", icon: Kanban }
+        { href: "/reports", label: "My Reports", icon: Kanban },
       );
     } else {
       items.push(
         { href: "/reports", label: "Team Reports", icon: CalendarTick },
-        { href: "/employees", label: "Employees", icon: People }
+        { href: "/employees", label: "Employees", icon: People },
       );
-      
-      // Manager-specific navigation
+
       if (currentUser?.role === "manager") {
-        items.push({ href: "/manager-tasks", label: "Team Tasks", icon: TaskSquare });
+        items.push({
+          href: "/manager-tasks",
+          label: "Team Tasks",
+          icon: TaskSquare,
+        });
       }
-      
-      // Admin-specific navigation
+
       if (currentUser?.role === "admin") {
-        items.push({ href: "/admin-tasks", label: "All Tasks", icon: TaskSquare });
+        items.push({
+          href: "/admin-tasks",
+          label: "All Tasks",
+          icon: TaskSquare,
+        });
       }
     }
 
@@ -60,7 +70,13 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
 
     if (permissions.canViewTeams) {
       items.push({ href: "/teams", label: "Teams", icon: Profile2User });
-      if (currentUser?.role === "admin") { items.push({ href: "/admin/create-manager", label: "Create Manager", icon: Setting2 }); }
+      if (currentUser?.role === "admin") {
+        items.push({
+          href: "/admin/create-manager",
+          label: "Create Manager",
+          icon: Setting2,
+        });
+      }
     }
     if (permissions.canViewCompanyAnalytics) {
       items.push({ href: "/analytics", label: "Analytics", icon: Chart2 });
@@ -77,7 +93,8 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
     <nav className="mt-8 space-y-2" aria-label="Primary navigation">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+        const active =
+          item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 
         return (
           <Link
@@ -85,8 +102,9 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
             href={item.href}
             aria-current={active ? "page" : undefined}
             title={isCollapsed ? item.label : undefined}
-            className={`group relative flex items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 ${isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
-              } ${active ? "text-white" : "text-slate-600 hover:text-primary-700"}`}
+            className={`group relative flex items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 ${
+              isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
+            } ${active ? "text-white" : "text-slate-600 hover:text-primary-700"}`}
           >
             {active ? (
               <motion.div
@@ -100,7 +118,12 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
             )}
 
             <span className="relative z-10 flex shrink-0 items-center justify-center">
-              <Icon size={24} color="currentColor" variant={active ? "Bold" : "Outline"} aria-hidden="true" />
+              <Icon
+                size={24}
+                color="currentColor"
+                variant={active ? "Bold" : "Outline"}
+                aria-hidden="true"
+              />
             </span>
 
             <AnimatePresence initial={false}>
