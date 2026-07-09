@@ -6,6 +6,7 @@ import { TaskModal } from "@/src/components/projects/task-modal";
 import { useAuthStore, useTaskStore, useEmployeeStore, useProjectStore } from "@/src/store";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Add } from "iconsax-react";
+import { getTaskManager } from "@/src/lib/utils/task-manager";
 import type { Task } from "@/src/types";
 
 export function TasksSection() {
@@ -23,7 +24,10 @@ export function TasksSection() {
 
     if (currentUser.role === "manager") {
       const teamMembers = allUsers.filter((user) => user.teamId === currentUser.teamId).map((user) => user.id);
-      return allTasks.filter((task) => teamMembers.includes(task.assigneeId));
+      return allTasks.filter((task) => {
+        const manager = getTaskManager(task.managerId, task.assigneeId, allUsers);
+        return teamMembers.includes(task.assigneeId) || manager?.id === currentUser.id;
+      });
     }
 
     if (currentUser.role === "employee") {

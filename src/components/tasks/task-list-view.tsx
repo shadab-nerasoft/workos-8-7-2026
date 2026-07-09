@@ -34,6 +34,7 @@ export function TaskListView({ tasks, employeeMap, onTaskClick, isLoading }: Tas
           task={task}
           onTaskClick={onTaskClick}
           assigneeName={employeeMap?.[task.assigneeId]?.name}
+          managerName={task.managerId ? employeeMap?.[task.managerId]?.name : undefined}
         />
       ))}
     </div>

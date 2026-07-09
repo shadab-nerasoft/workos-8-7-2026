@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useTaskStore, useEmployeeStore, useProjectStore } from "@/src/store";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useTaskStore, useEmployeeStore, useProjectStore, useAuthStore } from "@/src/store";
 import { AppShell } from "@/src/components/common/app-shell";
 import { PageHeader } from "@/src/components/sections/page-header";
 import { TaskFilterBar } from "@/src/components/tasks/task-filter-bar";
@@ -9,18 +10,31 @@ import { TaskListView } from "@/src/components/tasks/task-list-view";
 import { TaskKanbanView } from "@/src/components/tasks/task-kanban-view";
 import { TaskStatsCard } from "@/src/components/tasks/task-stats-card";
 import { TaskDetailModal } from "@/src/components/tasks/task-detail-modal";
+import { getTaskManager } from "@/src/lib/utils/task-manager";
 import { Grid2, Menu } from "iconsax-react";
 import type { TaskStatus, Task } from "@/src/types";
 
 type ViewMode = "list" | "kanban";
 
 export default function TeamTasksPage() {
+  const router = useRouter();
+  const { currentUser } = useAuthStore();
   const tasks = useTaskStore((s) => s.tasksList);
   const usersList = useEmployeeStore((s) => s.usersList);
   const projects = useProjectStore((s) => s.projects);
   const updateTask = useTaskStore((s) => s.updateTask);
   const moveTask = useTaskStore((s) => s.moveTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
+
+  useEffect(() => {
+    if (currentUser?.role === "employee") {
+      router.replace("/");
+    }
+  }, [currentUser, router]);
+
+  if (currentUser?.role === "employee") {
+    return null;
+  }
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -149,6 +163,7 @@ export default function TeamTasksPage() {
           onUpdate={updateTask}
           onDelete={deleteTask}
           assigneeName={selectedTask ? employeeMap[selectedTask.assigneeId]?.name : undefined}
+          managerName={selectedTask ? getTaskManager(selectedTask.managerId, selectedTask.assigneeId, usersList)?.name : undefined}
           projectName={selectedTask ? projectMap[selectedTask.projectId] : undefined}
         />
       </div>

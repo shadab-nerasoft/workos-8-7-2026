@@ -28,8 +28,11 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
       { href: "/", label: "Dashboard", icon: Element3 },
       { href: "/projects", label: "Projects", icon: TaskSquare },
       { href: "/tasks", label: "My Tasks", icon: Kanban },
-      { href: "/team-tasks", label: "Team Tasks", icon: TaskSquare },
     ];
+
+    if (!isEmployee) {
+      items.push({ href: "/team-tasks", label: "Team Tasks", icon: TaskSquare });
+    }
 
     if (isEmployee) {
       items.push(

@@ -23,6 +23,7 @@ interface TaskDetailModalProps {
   onAddAttachment?: (taskId: string, attachment: TaskAttachment) => void;
   onDeleteAttachment?: (taskId: string, attachmentId: string) => void;
   assigneeName?: string;
+  managerName?: string;
   projectName?: string;
   comments?: TaskComment[];
   attachments?: TaskAttachment[];
@@ -41,6 +42,7 @@ export function TaskDetailModal({
   onAddAttachment,
   onDeleteAttachment,
   assigneeName,
+  managerName,
   projectName,
   comments = [],
   attachments = [],
@@ -154,6 +156,11 @@ export function TaskDetailModal({
             <div>
               <p className="text-xs font-semibold uppercase text-slate-700">Assigned To</p>
               <p className="mt-2 text-sm text-slate-600">{assigneeName || "Unassigned"}</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-700">Manager</p>
+              <p className="mt-2 text-sm text-slate-600">{managerName || "Unassigned"}</p>
             </div>
           </>
         )}

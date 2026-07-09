@@ -9,9 +9,10 @@ interface TaskCardProps {
   task: Task;
   onTaskClick?: (task: Task) => void;
   assigneeName?: string;
+  managerName?: string;
 }
 
-export function TaskCard({ task, onTaskClick, assigneeName }: TaskCardProps) {
+export function TaskCard({ task, onTaskClick, assigneeName, managerName }: TaskCardProps) {
   const isOverdue = task.deadline && new Date(task.deadline) < new Date() && task.status !== "completed";
   const daysUntilDue = task.deadline ? Math.ceil((new Date(task.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
 
@@ -33,6 +34,7 @@ export function TaskCard({ task, onTaskClick, assigneeName }: TaskCardProps) {
 
       <div className="flex flex-col gap-2 text-xs text-slate-600">
         {assigneeName && <div className="font-medium text-slate-700">👤 {assigneeName}</div>}
+        <div className="font-medium text-slate-500">Manager: {managerName ?? "Unassigned"}</div>
 
         {task.deadline && (
           <div className="flex items-center gap-2">

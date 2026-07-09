@@ -8,6 +8,7 @@ import { TaskFilterBar } from "@/src/components/tasks/task-filter-bar";
 import { TaskListView } from "@/src/components/tasks/task-list-view";
 import { TaskStatsCard } from "@/src/components/tasks/task-stats-card";
 import { TaskDetailModal } from "@/src/components/tasks/task-detail-modal";
+import { getTaskManager } from "@/src/lib/utils/task-manager";
 import type { TaskStatus, Task } from "@/src/types";
 
 export default function AdminTasksPage() {
@@ -146,6 +147,7 @@ export default function AdminTasksPage() {
           onUpdate={updateTask}
           onDelete={deleteTask}
           assigneeName={selectedTask ? employeeMap[selectedTask.assigneeId]?.name : undefined}
+          managerName={selectedTask ? getTaskManager(selectedTask.managerId, selectedTask.assigneeId, usersList)?.name : undefined}
           projectName={selectedTask ? projectMap[selectedTask.projectId] : undefined}
         />
       </div>

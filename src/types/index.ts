@@ -62,6 +62,7 @@ export interface Task {
   description: string;
   projectId: string;
   assigneeId: string;
+  managerId?: string;
   status: TaskStatus;
   priority: Priority;
   deadline: string;

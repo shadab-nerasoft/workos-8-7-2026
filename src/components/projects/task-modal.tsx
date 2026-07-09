@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Modal } from "@/src/components/ui/modal";
 import { FormField, Input, TextArea, Select } from "@/src/components/ui/form-field";
-import { useAuthStore, useEmployeeStore, useTaskStore } from "@/src/store";
+import { useAuthStore, useEmployeeStore, useProjectStore, useTaskStore } from "@/src/store";
+import { getAssigneeManager } from "@/src/lib/utils/task-manager";
 import type { Task, TaskStatus, Priority } from "@/src/types";
 
 interface TaskModalProps {
@@ -16,6 +17,8 @@ interface TaskModalProps {
 export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) {
   const { currentUser } = useAuthStore();
   const allUsers = useEmployeeStore((s) => s.getAllUsers());
+  const allProjects = useProjectStore((s) => s.getAllProjects());
+  const allTasks = useTaskStore((s) => s.tasksList);
   const createTask = useTaskStore((s) => s.createTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -31,6 +34,42 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
   const [priority, setPriority] = useState<Priority>("medium");
   const [deadline, setDeadline] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId);
+  const manager = getAssigneeManager(assigneeId, allUsers);
+
+  const availableProjects = useMemo(() => {
+    if (!currentUser) {
+      return [];
+    }
+
+    const currentProject = allProjects.find((project) => project.id === (task?.projectId ?? projectId));
+
+    if (currentUser.role === "admin") {
+      return allProjects;
+    }
+
+    if (currentUser.role === "manager") {
+      const managerProjects = allProjects.filter(
+        (project) => project.ownerId === currentUser.id || project.teamId === currentUser.teamId,
+      );
+
+      return currentProject && !managerProjects.some((project) => project.id === currentProject.id)
+        ? [currentProject, ...managerProjects]
+        : managerProjects;
+    }
+
+    const assignedProjectIds = new Set(
+      allTasks
+        .filter((userTask) => userTask.assigneeId === currentUser.id)
+        .map((userTask) => userTask.projectId),
+    );
+
+    const employeeProjects = allProjects.filter((project) => assignedProjectIds.has(project.id));
+
+    return currentProject && !employeeProjects.some((project) => project.id === currentProject.id)
+      ? [currentProject, ...employeeProjects]
+      : employeeProjects;
+  }, [allProjects, allTasks, currentUser, projectId, task]);
 
   useEffect(() => {
     if (isOpen) {
@@ -41,6 +80,7 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
         setPriority(task.priority);
         setDeadline(task.deadline);
         setAssigneeId(task.assigneeId);
+        setSelectedProjectId(task.projectId);
       } else {
         setTitle("");
         setDescription("");
@@ -52,30 +92,37 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
         setDeadline(nextWeek.toISOString().split('T')[0]);
         // Employees can only assign to themselves
         setAssigneeId(isEmployee && currentUser ? currentUser.id : "");
+        setSelectedProjectId(availableProjects[0]?.id ?? projectId);
       }
     }
-  }, [isOpen, task, isEmployee, currentUser]);
+  }, [availableProjects, isOpen, projectId, task, isEmployee, currentUser]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isReadOnly) return;
+    if (isReadOnly || !selectedProjectId) return;
 
     if (isEdit) {
       updateTask(task.id, {
         title,
         description,
+        projectId: selectedProjectId,
         status,
         priority,
         deadline,
         assigneeId,
+        managerId: manager?.id,
       });
     } else {
+      const finalAssigneeId = isEmployee && currentUser ? currentUser.id : assigneeId;
+      const finalManager = getAssigneeManager(finalAssigneeId, allUsers);
+
       createTask({
         id: `t-${Date.now()}`,
         title,
         description,
-        projectId,
-        assigneeId: isEmployee && currentUser ? currentUser.id : assigneeId,
+        projectId: selectedProjectId,
+        assigneeId: finalAssigneeId,
+        managerId: finalManager?.id,
         status,
         priority,
         deadline,
@@ -115,6 +162,23 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
             disabled={isReadOnly}
             required
           />
+        </FormField>
+
+        <FormField id="project" label="Project" required>
+          <Select
+            id="project"
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            disabled={isReadOnly}
+            required
+          >
+            <option value="" disabled>Select a project</option>
+            {availableProjects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </Select>
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">
@@ -176,6 +240,15 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
           </FormField>
         </div>
 
+        <FormField id="manager" label="Manager">
+          <Input
+            id="manager"
+            value={manager ? `${manager.name} (${manager.role})` : "No manager assigned"}
+            disabled
+            readOnly
+          />
+        </FormField>
+
         {!isReadOnly && (
           <div className="mt-2 flex justify-end gap-3 border-t pt-5 divider-accent">
             <button
@@ -187,6 +260,7 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
             </button>
             <button
               type="submit"
+              disabled={!selectedProjectId}
               className="rounded-xl bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
               {isEdit ? "Save Changes" : "Create Task"}

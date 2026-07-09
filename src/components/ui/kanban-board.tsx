@@ -19,6 +19,7 @@ import { ArrowDown2, MessageText1, Paperclip2 } from "iconsax-react";
 import { PriorityBadge } from "@/src/components/ui/badge";
 import { useAuthStore, useTaskStore } from "@/src/store";
 import { formatDate, titleCase } from "@/src/lib/utils/format";
+import { getTaskManager } from "@/src/lib/utils/task-manager";
 import type { Task, TaskStatus, User } from "@/src/types";
 
 const columns: TaskStatus[] = ["backlog", "todo", "in-progress", "review", "completed"];
@@ -169,7 +170,11 @@ export function KanbanBoard({
       </div>
       <DragOverlay>
         {activeTask ? (
-          <TaskCardOverlay task={activeTask} assignee={usersById.get(activeTask.assigneeId)} />
+          <TaskCardOverlay
+            task={activeTask}
+            assignee={usersById.get(activeTask.assigneeId)}
+            manager={getTaskManager(activeTask.managerId, activeTask.assigneeId, Array.from(usersById.values()))}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>
@@ -204,6 +209,7 @@ function KanbanColumn({
               key={task.id}
               task={task}
               assignee={usersById.get(task.assigneeId)}
+              manager={getTaskManager(task.managerId, task.assigneeId, Array.from(usersById.values()))}
               onStatusChange={onStatusChange}
               onTaskSelect={onTaskSelect}
             />
@@ -222,11 +228,13 @@ function KanbanColumn({
 function TaskCard({
   task,
   assignee,
+  manager,
   onStatusChange,
   onTaskSelect,
 }: {
   task: Task;
   assignee?: User;
+  manager?: User;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onTaskSelect?: (task: Task) => void;
 }) {
@@ -246,15 +254,15 @@ function TaskCard({
       onClick={() => onTaskSelect?.(task)}
       className="cursor-grab rounded-2xl border border-primary-200/70 bg-white p-4 shadow-sm outline-none ring-1 ring-transparent transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md focus:ring-2 focus:ring-primary-500 active:cursor-grabbing"
     >
-      <TaskCardContent task={task} assignee={assignee} onStatusChange={onStatusChange} />
+      <TaskCardContent task={task} assignee={assignee} manager={manager} onStatusChange={onStatusChange} />
     </article>
   );
 }
 
-function TaskCardOverlay({ task, assignee }: { task: Task; assignee?: User }) {
+function TaskCardOverlay({ task, assignee, manager }: { task: Task; assignee?: User; manager?: User }) {
   return (
     <article className="cursor-grabbing rounded-2xl border border-primary-300 bg-white p-4 shadow-lg ring-2 ring-primary-500/30">
-      <TaskCardContent task={task} assignee={assignee} />
+      <TaskCardContent task={task} assignee={assignee} manager={manager} />
     </article>
   );
 }
@@ -262,10 +270,12 @@ function TaskCardOverlay({ task, assignee }: { task: Task; assignee?: User }) {
 function TaskCardContent({
   task,
   assignee,
+  manager,
   onStatusChange,
 }: {
   task: Task;
   assignee?: User;
+  manager?: User;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
 }) {
   const dueDate = task.deadline ? formatDate(task.deadline) : "No due date";
@@ -313,7 +323,12 @@ function TaskCardContent({
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-50 text-[11px] font-semibold leading-4 text-primary-700">
             {assignee?.avatar ?? "NA"}
           </span>
-          <span className="text-xs font-medium leading-5 text-slate-500">{dueDate}</span>
+          <div className="min-w-0">
+            <span className="block text-xs font-medium leading-5 text-slate-500">{dueDate}</span>
+            <span className="block truncate text-[11px] font-semibold leading-4 text-slate-400">
+              Manager: {manager?.name ?? "Unassigned"}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2 text-slate-400">
           <span className="inline-flex items-center gap-1 text-xs leading-5">

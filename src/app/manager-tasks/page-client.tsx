@@ -8,6 +8,7 @@ import { TaskFilterBar } from "@/src/components/tasks/task-filter-bar";
 import { TaskListView } from "@/src/components/tasks/task-list-view";
 import { TaskStatsCard } from "@/src/components/tasks/task-stats-card";
 import { TaskDetailModal } from "@/src/components/tasks/task-detail-modal";
+import { getTaskManager } from "@/src/lib/utils/task-manager";
 import type { TaskStatus, Task } from "@/src/types";
 
 export default function ManagerTasksPage() {
@@ -35,7 +36,10 @@ export default function ManagerTasksPage() {
 
   // Get team tasks filtered by current filters
   const teamTasks = useMemo(() => {
-    let filtered = tasks.filter((t) => teamMemberIds.includes(t.assigneeId));
+    let filtered = tasks.filter((task) => {
+      const manager = getTaskManager(task.managerId, task.assigneeId, usersList);
+      return teamMemberIds.includes(task.assigneeId) || manager?.id === currentUser?.id;
+    });
 
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
@@ -53,7 +57,7 @@ export default function ManagerTasksPage() {
     }
 
     return filtered;
-  }, [tasks, teamMemberIds, filters]);
+  }, [tasks, teamMemberIds, usersList, currentUser, filters]);
 
   const taskStats = useMemo(() => {
     return {
@@ -115,6 +119,7 @@ export default function ManagerTasksPage() {
           onUpdate={updateTask}
           onDelete={deleteTask}
           assigneeName={selectedTask ? employeeMap[selectedTask.assigneeId]?.name : undefined}
+          managerName={selectedTask ? getTaskManager(selectedTask.managerId, selectedTask.assigneeId, usersList)?.name : undefined}
           projectName={selectedTask ? projectMap[selectedTask.projectId] : undefined}
         />
       </div>
