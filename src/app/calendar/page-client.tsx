@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useTaskStore, useAuthStore, useProjectStore } from "@/src/store";
+import { useTaskStore, useAuthStore, useProjectStore, useEmployeeStore } from "@/src/store";
+import { tasksApi } from "@/src/services";
+import { can } from "@/src/lib/permissions";
 import { AppShell } from "@/src/components/common/app-shell";
 import { CalendarGrid, type CalendarViewMode } from "@/src/components/calendar/calendar-grid";
 import { CalendarSidebar } from "@/src/components/calendar/calendar-sidebar";
+import { TaskModal } from "@/src/components/projects/task-modal";
+import type { Task } from "@/src/types";
 
 function getMonday(d: Date): Date {
   const date = new Date(d);
@@ -15,15 +19,22 @@ function getMonday(d: Date): Date {
   return date;
 }
 
+/**
+ * Composition root for the calendar route.
+ * Owns all data (stores), permission checks, and the task modal.
+ * Child components are pure and receive everything via props.
+ */
 export default function CalendarPage() {
-  const { currentUser } = useAuthStore();
-  const getAllTasks = useTaskStore((s) => s.getAllTasks);
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const allTasks = useTaskStore((s) => s.tasks);
   const projects = useProjectStore((s) => s.projectsList);
+  const users = useEmployeeStore((s) => s.usersList);
 
   // Hydration-safe: start null, set on mount
   const [mounted, setMounted] = useState(false);
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -83,30 +94,33 @@ export default function CalendarPage() {
     setFocusDate(date);
   }, []);
 
+  // Role-based task scoping, owned by the page
   const tasks = useMemo(() => {
-    let allTasks = getAllTasks();
+    let visible = allTasks;
 
     if (currentUser?.role === "employee") {
-      allTasks = allTasks.filter((t) => t.assigneeId === currentUser.id);
+      visible = visible.filter((t) => t.assigneeId === currentUser.id);
     } else if (currentUser?.role === "manager") {
       const teamProjectIds = new Set(
         projects.filter((p) => p.teamId === currentUser.teamId).map((p) => p.id)
       );
-      allTasks = allTasks.filter((t) => teamProjectIds.has(t.projectId));
+      visible = visible.filter((t) => teamProjectIds.has(t.projectId));
     }
 
     if (selectedAssignees.size > 0) {
-      allTasks = allTasks.filter((t) => selectedAssignees.has(t.assigneeId));
+      visible = visible.filter((t) => selectedAssignees.has(t.assigneeId));
     }
 
     if (selectedCategories.size > 0) {
-      allTasks = allTasks.filter((t) => selectedCategories.has(t.priority));
+      visible = visible.filter((t) => selectedCategories.has(t.priority));
     } else {
-      allTasks = [];
+      visible = [];
     }
 
-    return allTasks;
-  }, [getAllTasks, currentUser, projects, selectedAssignees, selectedCategories]);
+    return visible;
+  }, [allTasks, currentUser, projects, selectedAssignees, selectedCategories]);
+
+  const canFilterAssignees = currentUser?.role !== "employee";
 
   if (!mounted) {
     return (
@@ -128,6 +142,9 @@ export default function CalendarPage() {
           onToggleAssignee={handleToggleAssignee}
           selectedCategories={selectedCategories}
           onToggleCategory={handleToggleCategory}
+          users={users}
+          tasks={tasks}
+          canFilterAssignees={canFilterAssignees}
         />
         <CalendarGrid
           focusDate={focusDate}
@@ -136,8 +153,25 @@ export default function CalendarPage() {
           onPrev={handlePrev}
           onNext={handleNext}
           tasks={tasks}
+          users={users}
+          onTaskSelect={setSelectedTask}
         />
       </div>
+
+      {selectedTask && currentUser && (
+        <TaskModal
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          task={selectedTask}
+          projectId={selectedTask.projectId}
+          users={users}
+          isReadOnly={!can(currentUser, "task:edit", { task: selectedTask })}
+          lockAssigneeTo={currentUser.role === "employee" ? currentUser.id : null}
+          onSubmit={(values) => {
+            void tasksApi.updateTask(selectedTask.id, values);
+          }}
+        />
+      )}
     </AppShell>
   );
 }

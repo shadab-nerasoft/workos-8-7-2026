@@ -2,17 +2,17 @@
 
 import { AnalyticsChart } from "@/src/components/ui/analytics-chart";
 import { Card, CardHeader } from "@/src/components/ui/card";
-import { useAuthStore } from "@/src/store";
 import { dashboardStats, analytics } from "@/src/mock-data/analytics";
 import { EmptyState } from "@/src/components/ui/empty-state";
 
-export function AnalyticsSection() {
-  const { currentUser } = useAuthStore();
-  const permissions = currentUser?.role === "admin" 
-    ? { canViewCompanyAnalytics: true } 
-    : { canViewCompanyAnalytics: false };
+interface AnalyticsSectionProps {
+  /** Whether the viewer may see company-wide analytics (computed by the page via permissions). */
+  canViewCompanyAnalytics: boolean;
+}
 
-  if (!permissions.canViewCompanyAnalytics) {
+/** Pure presentational analytics section. Permission comes from the page. */
+export function AnalyticsSection({ canViewCompanyAnalytics }: AnalyticsSectionProps) {
+  if (!canViewCompanyAnalytics) {
     return <EmptyState title="Access restricted" message="Only administrators have access to company-wide operating analytics." />;
   }
 

@@ -24,8 +24,8 @@ interface TaskModalProps {
   projectId: string;
   /** Users that can be assigned, provided by the page. */
   users: User[];
-  /** Projects the current user may move this task into, pre-scoped by the page. */
-  availableProjects: Project[];
+  /** Projects the current user may move this task into, pre-scoped by the page. Omit to hide the project selector. */
+  availableProjects?: Project[];
   /** True when the viewer may not modify this task (computed by the page via permissions). */
   isReadOnly?: boolean;
   /** True when the assignee field is locked to the current user (employees). */
@@ -80,7 +80,7 @@ export function TaskModal({
         nextWeek.setDate(nextWeek.getDate() + 7);
         setDeadline(nextWeek.toISOString().split("T")[0]);
         setAssigneeId(lockAssigneeTo ?? "");
-        setSelectedProjectId(availableProjects[0]?.id ?? projectId);
+        setSelectedProjectId(availableProjects?.[0]?.id ?? projectId);
       }
     }
   }, [availableProjects, isOpen, projectId, task, lockAssigneeTo]);
@@ -135,22 +135,24 @@ export function TaskModal({
           />
         </FormField>
 
-        <FormField id="project" label="Project" required>
-          <Select
-            id="project"
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            disabled={isReadOnly}
-            required
-          >
-            <option value="" disabled>Select a project</option>
-            {availableProjects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+        {availableProjects && availableProjects.length > 0 && (
+          <FormField id="project" label="Project" required>
+            <Select
+              id="project"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              disabled={isReadOnly}
+              required
+            >
+              <option value="" disabled>Select a project</option>
+              {availableProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField id="status" label="Status">

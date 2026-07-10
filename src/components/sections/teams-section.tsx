@@ -6,11 +6,49 @@ import { Card } from "@/src/components/ui/card";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Badge } from "@/src/components/ui/badge";
 import { Modal } from "@/src/components/ui/modal";
-import { useAuthStore, useTeamStore, useEmployeeStore, useProjectStore, useTaskStore } from "@/src/store";
-import { TeamsService } from "@/src/services/teams.service";
-import type { User, Team, Project } from "@/src/types";
+import type { User, Team, Project, Task } from "@/src/types";
 import { titleCase } from "@/src/lib/utils/format";
 import { People, InfoCircle, VolumeHigh, Edit2, Chart, Command, Headphone, Designtools } from "iconsax-react";
+
+export interface TeamFormValues {
+  name: string;
+  leadId: string;
+  description: string;
+  icon: string;
+  type: string;
+  priority: string;
+  goals: string;
+  memberIds: string[];
+}
+
+export interface ManagerFormValues {
+  name: string;
+  department: string;
+  canCreateTeam: boolean;
+}
+
+interface TeamsSectionProps {
+  /** The signed-in user (for identity comparisons only). */
+  currentUser: User;
+  /** Teams visible to the viewer, pre-scoped by the page. */
+  teams: Team[];
+  /** All users, provided by the page. */
+  users: User[];
+  /** All projects, provided by the page. */
+  projects: Project[];
+  /** All tasks, provided by the page. */
+  tasks: Task[];
+  /** Permission booleans computed by the page via permissions module. */
+  canViewSection: boolean;
+  canManageManagers: boolean;
+  canCreateTeam: boolean;
+  /** True when the viewer sees all teams (admin). */
+  isCompanyWide: boolean;
+  /** Mutation callbacks — the page owns persistence. */
+  onCreateTeam: (values: TeamFormValues) => void;
+  onUpdateTeam: (teamId: string, values: TeamFormValues, previousMemberIds: string[]) => void;
+  onCreateManager: (values: ManagerFormValues) => void;
+}
 
 // Helper for rendering custom SVGs for team icons
 const getIconSvg = (name?: string, isActive?: boolean) => {
@@ -107,12 +145,21 @@ const getDeptColorClasses = (dept: string) => {
   };
 };
 
-export function TeamsSection() {
-  const { currentUser } = useAuthStore();
-  const allTeams = useTeamStore((s) => s.getAllTeams());
-  const allUsers = useEmployeeStore((s) => s.getAllUsers());
-  const allProjects = useProjectStore((s) => s.getAllProjects());
-  const allTasks = useTaskStore((s) => s.getAllTasks());
+/** Pure presentational teams section. All data, scoping, permissions, and persistence are owned by the page. */
+export function TeamsSection({
+  currentUser,
+  teams: allTeams,
+  users: allUsers,
+  projects: allProjects,
+  tasks: allTasks,
+  canViewSection,
+  canManageManagers,
+  canCreateTeam,
+  isCompanyWide,
+  onCreateTeam,
+  onUpdateTeam,
+  onCreateManager,
+}: TeamsSectionProps) {
 
   // Navigation tabs (Only visible to Admin)
   const [activeTab, setActiveTab] = useState<"teams" | "managers">("teams");
@@ -152,9 +199,7 @@ export function TeamsSection() {
   // Admin filter by department
   const [departmentFilter, setDepartmentFilter] = useState<string>("All");
 
-  if (!currentUser) return null;
-
-  if (currentUser.role === "employee") {
+  if (!canViewSection) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white border border-slate-200 rounded-2xl shadow-2xs">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 border border-red-100 text-red-600 mb-4">
@@ -177,19 +222,16 @@ export function TeamsSection() {
     );
   }
 
-  const isAdmin = currentUser.role === "admin";
-  const isManager = currentUser.role === "manager";
+  const isAdmin = isCompanyWide;
+  const isManager = !isCompanyWide;
 
   // Managers should not see other managers (Managers tab only visible to Admin)
-  const showManagersTab = isAdmin;
+  const showManagersTab = canManageManagers;
 
-  // Check if current user has team creation access (All managers have access by default)
-  const canCreateTeam = isAdmin || isManager;
-
-  // Teams view filter: managers see only their led teams, employees see their team, admin sees all (with department filter)
-  const visibleTeams = isAdmin
-    ? (departmentFilter === "All" ? allTeams : allTeams.filter((t) => t.type === departmentFilter))
-    : allTeams.filter((t) => t.leadId === currentUser.id || t.id === currentUser.teamId);
+  // Teams are pre-scoped by the page; the department filter is local UI state.
+  const visibleTeams = isCompanyWide && departmentFilter !== "All"
+    ? allTeams.filter((t) => t.type === departmentFilter)
+    : allTeams;
 
   // Managers list (Admins only view)
   const managers = allUsers.filter((u) => u.role === "manager");
@@ -229,52 +271,21 @@ export function TeamsSection() {
 
     if (!leadId) return;
 
+    const values: TeamFormValues = {
+      name: newTeamName.trim(),
+      leadId,
+      description: newTeamDesc.trim(),
+      icon: newTeamIcon,
+      type: newTeamType,
+      priority: newTeamPriority,
+      goals: newTeamGoals.trim(),
+      memberIds: Array.from(new Set([leadId, ...selectedMembers])),
+    };
+
     if (editingTeam) {
-      // Perform update
-      useTeamStore.getState().updateTeam(editingTeam.id, {
-        name: newTeamName.trim(),
-        leadId,
-        description: newTeamDesc.trim(),
-        icon: newTeamIcon,
-        type: newTeamType,
-        priority: newTeamPriority,
-        goals: newTeamGoals.trim(),
-        memberIds: Array.from(new Set([leadId, ...selectedMembers]))
-      });
-
-      // Update teamId for the members
-      const employeeStore = useEmployeeStore.getState();
-
-      const oldMembers = editingTeam.memberIds;
-      const newMembers = Array.from(new Set([leadId, ...selectedMembers]));
-      const removedMembers = oldMembers.filter(mId => !newMembers.includes(mId));
-
-      removedMembers.forEach(mId => {
-        const u = employeeStore.getUserById(mId);
-        if (u && u.teamId === editingTeam.id) {
-          employeeStore.updateUser(mId, { teamId: "" });
-        }
-      });
-
-      newMembers.forEach(mId => {
-        const u = employeeStore.getUserById(mId);
-        if (u) {
-          employeeStore.updateUser(mId, { teamId: editingTeam.id });
-        }
-      });
-
+      onUpdateTeam(editingTeam.id, values, editingTeam.memberIds);
     } else {
-      // Perform create
-      TeamsService.createTeam({
-        name: newTeamName,
-        leadId,
-        description: newTeamDesc,
-        icon: newTeamIcon,
-        type: newTeamType,
-        priority: newTeamPriority,
-        goals: newTeamGoals,
-        memberIds: selectedMembers
-      });
+      onCreateTeam(values);
     }
 
     // Reset Form
@@ -294,7 +305,7 @@ export function TeamsSection() {
     e.preventDefault();
     if (!newManagerName.trim()) return;
 
-    TeamsService.createManager({
+    onCreateManager({
       name: newManagerName,
       department: newManagerDept,
       canCreateTeam: newManagerAccess,
@@ -426,7 +437,7 @@ export function TeamsSection() {
                     Project Members (Click to view Profile & Report)
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {TeamsService.getTeamMembers(selectedProject.teamId).map((emp) => (
+                    {allUsers.filter((u) => u.teamId === selectedProject.teamId).map((emp) => (
                       <Link
                         key={emp.id}
                         href={`/employees/${emp.id}`}
@@ -1065,10 +1076,16 @@ export function TeamsSection() {
       {activeTab === "managers" && showManagersTab && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {managers.map((manager) => {
-            const stats = TeamsService.getManagerAnalytics(manager);
-            const deptThemes = getDeptColorClasses(stats.department);
             const teams = allTeams.filter((t) => t.leadId === manager.id);
             const teamIds = new Set(teams.map((t) => t.id));
+            const managerProjects = allProjects.filter((p) => teamIds.has(p.teamId));
+            const stats = {
+              department: manager.department || manager.title.replace(" Manager", "") || "Engineering",
+              teamsCount: teams.length,
+              ongoingProjectsCount: managerProjects.filter((p) => p.status !== "completed").length,
+              completedProjectsCount: managerProjects.filter((p) => p.status === "completed").length,
+            };
+            const deptThemes = getDeptColorClasses(stats.department);
 
             return (
               <Card

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, LoginCurve, ProfileAdd, ShieldTick } from "iconsax-react";
 import { z } from "zod";
-import { useAuthStore, useEmployeeStore } from "@/src/store";
+import { authApi } from "@/src/services";
 
 type AuthMode = "login" | "register";
 
@@ -32,8 +32,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [errors, setErrors] = useState<FormErrors>({});
   const [success, setSuccess] = useState("");
   const router = useRouter();
-  const { login } = useAuthStore();
-  const allUsers = useEmployeeStore((s) => s.getAllUsers());
 
   function handleSubmit(formData: FormData): void {
     const payload = {
@@ -60,17 +58,21 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
 
     setErrors({});
-    
+
     if (mode === "login") {
-      setSuccess("Login validated. Redirecting to workspace...");
-      // Mock login: find user by email or fallback to first admin
-      const user = allUsers.find(u => u.email === payload.email) || allUsers.find(u => u.role === "admin");
-      if (user) {
-        setTimeout(() => {
-          login(user);
+      // Strict login through the auth service — unknown emails are rejected.
+      authApi
+        .login(payload.email, payload.password)
+        .then(() => {
+          setSuccess("Login validated. Redirecting to workspace...");
           router.push("/");
-        }, 800);
-      }
+        })
+        .catch((err: unknown) => {
+          setSuccess("");
+          setErrors({
+            email: err instanceof Error ? err.message : "Invalid email or password.",
+          });
+        });
     } else {
       setSuccess("Account details validated. Registration is ready for backend integration.");
     }

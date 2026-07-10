@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { ArrowLeft2, ArrowRight2, ArrowDown2, ArrowUp2 } from "iconsax-react";
-import { useEmployeeStore, useAuthStore, useTaskStore } from "@/src/store";
+import type { Task, User } from "@/src/types";
 
 interface CalendarSidebarProps {
   currentWeekStart: Date;
@@ -11,6 +11,12 @@ interface CalendarSidebarProps {
   onToggleAssignee: (id: string) => void;
   selectedCategories: Set<string>;
   onToggleCategory: (id: string) => void;
+  /** Users available for the assignee filter, provided by the page. */
+  users: User[];
+  /** All visible tasks (for category counts), provided by the page. */
+  tasks: Task[];
+  /** Whether the assignee filter section is shown (computed by the page via permissions). */
+  canFilterAssignees?: boolean;
 }
 
 const DAYS_HEADER = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -29,11 +35,10 @@ export function CalendarSidebar({
   onToggleAssignee,
   selectedCategories,
   onToggleCategory,
+  users,
+  tasks: allTasks,
+  canFilterAssignees = true,
 }: CalendarSidebarProps) {
-  const { currentUser } = useAuthStore();
-  const users = useEmployeeStore((s) => s.usersList);
-  const allTasks = useTaskStore((s) => s.tasks);
-
   const [scheduleOpen, setScheduleOpen] = useState(true);
   const [categoriesOpen, setCategoriesOpen] = useState(true);
 
@@ -45,8 +50,6 @@ export function CalendarSidebar({
   const startOffset = rawFirstDay === 0 ? 6 : rawFirstDay - 1;
 
   const monthLabel = miniDate.toLocaleString("default", { month: "long" });
-
-  const canFilterAssignees = currentUser?.role !== "employee";
 
   // Count tasks per category
   const categoryCounts = useMemo(() => {

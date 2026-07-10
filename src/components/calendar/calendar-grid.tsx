@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { ArrowLeft2, ArrowRight2, Add } from "iconsax-react";
-import { useEmployeeStore } from "@/src/store";
-import { TaskModal } from "@/src/components/projects/task-modal";
-import type { Task } from "@/src/types";
+import type { Task, User } from "@/src/types";
 
 export type CalendarViewMode = "day" | "week" | "month";
 
@@ -15,6 +13,9 @@ interface CalendarGridProps {
   onPrev: () => void;
   onNext: () => void;
   tasks: Task[];
+  users: User[];
+  /** Called when a task is clicked. The page owns the task modal. */
+  onTaskSelect?: (task: Task) => void;
 }
 
 /* ── Constants ── */
@@ -84,9 +85,9 @@ export function CalendarGrid({
   onPrev,
   onNext,
   tasks,
+  users,
+  onTaskSelect,
 }: CalendarGridProps) {
-  const users = useEmployeeStore((s) => s.usersList);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const getUser = useCallback((id: string) => users.find((u) => u.id === id), [users]);
 
   const today = useMemo(() => new Date(), []);
@@ -253,7 +254,7 @@ export function CalendarGrid({
       <button
         key={task.id}
         type="button"
-        onClick={() => setSelectedTask(task)}
+        onClick={() => onTaskSelect?.(task)}
         className="absolute rounded-lg overflow-hidden transition-all hover:shadow-lg hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 text-left"
         style={{ top: topPx, left: leftCalc, width: widthCalc, height: heightPx, backgroundColor: style.bg, borderLeft: `4px solid ${style.border}`, zIndex: 10, cursor: "pointer" }}
       >
@@ -369,7 +370,7 @@ export function CalendarGrid({
                     <button
                       key={task.id}
                       type="button"
-                      onClick={() => setSelectedTask(task)}
+                      onClick={() => onTaskSelect?.(task)}
                       className="w-full rounded px-1.5 py-1 text-left transition-all hover:shadow-sm hover:scale-[1.02]"
                       style={{ backgroundColor: s.bg, borderLeft: `3px solid ${s.border}` }}
                     >
@@ -395,15 +396,6 @@ export function CalendarGrid({
       {viewMode === "day" && renderTimeGrid([focusDate], 1)}
       {viewMode === "week" && renderTimeGrid(weekDates, 7)}
       {viewMode === "month" && renderMonthView()}
-
-      {selectedTask && (
-        <TaskModal
-          isOpen={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
-          task={selectedTask}
-          projectId={selectedTask.projectId}
-        />
-      )}
     </div>
   );
 }
