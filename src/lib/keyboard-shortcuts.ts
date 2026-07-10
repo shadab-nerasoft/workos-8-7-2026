@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
 export const KEYBOARD_SHORTCUTS = {
   // Search
   SEARCH: { key: "k", modifiers: ["cmd"], description: "Open search" },
@@ -63,11 +67,26 @@ export function registerKeyboardShortcut(
   }
 }
 
+/**
+ * Real React hook: registers the shortcut on mount and removes the
+ * listener on unmount (or when inputs change).
+ */
 export function useKeyboardShortcut(
   shortcutKey: string,
   modifiers: string[],
   callback: () => void
 ) {
-  // This would be implemented in a custom hook in practice
-  return () => registerKeyboardShortcut(shortcutKey, modifiers, callback);
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
+  const modifiersKey = modifiers.join(",");
+
+  useEffect(() => {
+    const unregister = registerKeyboardShortcut(
+      shortcutKey,
+      modifiersKey ? modifiersKey.split(",") : [],
+      () => callbackRef.current()
+    );
+    return unregister;
+  }, [shortcutKey, modifiersKey]);
 }

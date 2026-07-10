@@ -22,8 +22,10 @@ import { useAuthStore, useTaskStore } from "@/src/store";
 export function GlobalSearch() {
   const router = useRouter();
   const permissions = usePermissions();
-  const { currentUser } = useAuthStore();
-  const allTasks = useTaskStore((s) => s.getAllTasks());
+  const currentUser = useAuthStore((s) => s.currentUser);
+  // Select the stable array reference directly — calling getAllTasks() in a
+  // selector would create a new array every render and cause re-render loops.
+  const allTasks = useTaskStore((s) => s.tasks);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);

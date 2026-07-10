@@ -37,7 +37,8 @@ const getInitialFormState = (user: User): ProfileFormState => ({
 });
 
 export default function ProfilePage() {
-  const { currentUser, setCurrentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const setCurrentUser = useAuthStore((s) => s.setCurrentUser);
   const updateUser = useEmployeeStore((state) => state.updateUser);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [form, setForm] = useState<ProfileFormState | null>(null);

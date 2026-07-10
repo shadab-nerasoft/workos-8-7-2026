@@ -220,6 +220,15 @@ function WheelPicker({
     }
   }, [value, options]);
 
+  // Clear any pending scroll timer on unmount to avoid a leaked timeout.
+  useEffect(() => {
+    return () => {
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, []);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     isScrolling.current = true;
     if (scrollTimeout.current) {
@@ -767,7 +776,7 @@ const PreviewSubmitStep = ({
   onBack,
   onSubmit,
 }: PreviewSubmitStepProps) => {
-  const { currentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.currentUser);
   const allEmployees = useEmployeeStore((state) => state.getAllUsers());
   const managerId = currentUser?.role === 'employee' ? allEmployees.find(emp => emp.id === currentUser?.id)?.createdBy || '' : '';
   const manager = allEmployees.find(emp => emp.id === managerId);
@@ -844,7 +853,7 @@ const PreviewSubmitStep = ({
 
 export default function CreateDailyReportPage() {
   const router = useRouter();
-  const { currentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.currentUser);
   const createReport = useDailyReportStore((state) => state.createReport);
   const allEmployees = useEmployeeStore((state) => state.getAllUsers());
   const allTeams = useTeamStore((state) => state.getAllTeams());

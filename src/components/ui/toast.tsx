@@ -34,18 +34,24 @@ export function Toaster() {
   const [toasts, setToasts] = useState<ToastProps[]>([]);
 
   useEffect(() => {
+    // Track pending dismiss timers so they can be cleared on unmount.
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+
     const handleToast = (newToast: ToastProps) => {
       setToasts((current) => [...current, newToast]);
-      
+
       // Auto dismiss after 4 seconds
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        timers.delete(timer);
         setToasts((current) => current.filter((t) => t.id !== newToast.id));
       }, 4000);
+      timers.add(timer);
     };
 
     listeners.add(handleToast);
     return () => {
       listeners.delete(handleToast);
+      timers.forEach((timer) => clearTimeout(timer));
     };
   }, []);
 

@@ -34,7 +34,7 @@ const datePresets: { key: DateFilter; label: string }[] = [
 ];
 
 export default function ReportsPage() {
-  const { currentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.currentUser);
   const allReports = useDailyReportStore((s) => s.reportsList);
   const allEmployees = useEmployeeStore((s) => s.getAllUsers());
 
@@ -194,7 +194,7 @@ export default function ReportsPage() {
     return colors[code % colors.length];
   };
 
-  // ────────────────────────────────────────────────────────
+  // ───────────��────────────────────────────────────────────
   // Employee Layout Renders
   // ────────────────────────────────────────────────────────
   if (isEmployee) {

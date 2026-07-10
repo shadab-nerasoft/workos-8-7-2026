@@ -4,12 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/src/components/common/auth-shell";
-import { useAuthStore } from "@/src/store";
+import { authApi } from "@/src/services";
 import { User, Lock, Mail, Building, Briefcase, Phone } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
   
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -47,27 +46,21 @@ export default function SignupPage() {
     setError(null);
     setIsLoading(true);
 
-    // Mock signup logic
-    setTimeout(() => {
-      const newUser = {
-        id: formData.employeeId || `EMP-${Math.floor(Math.random() * 1000)}`,
-        name: formData.fullName,
-        role: "employee" as const,
-        title: formData.designation,
+    try {
+      await authApi.signup({
+        fullName: formData.fullName,
         email: formData.email,
-        teamId: "t-general",
-        avatar: formData.fullName.charAt(0),
-        utilization: 0,
-        performance: 0,
+        employeeId: formData.employeeId,
         department: formData.department,
         designation: formData.designation,
         mobileNumber: formData.mobileNumber,
-      };
-
-      login(newUser);
+      });
       router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Signup failed. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

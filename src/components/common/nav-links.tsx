@@ -20,7 +20,7 @@ import { useMemo } from "react";
 export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
   const pathname = usePathname();
   const permissions = usePermissions();
-  const { currentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.currentUser);
 
   const navItems = useMemo(() => {
     const isEmployee = currentUser?.role === "employee";

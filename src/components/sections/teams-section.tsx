@@ -1141,7 +1141,7 @@ export function TeamsSection({
                       onClick={() => {
                         setSelectedManagerForProjects(manager);
                         setProjectFilter("completed");
-                        const completedProjects = TeamsService.getManagerCompletedProjects(manager.id);
+                        const completedProjects = managerProjects.filter((p) => p.status === "completed");
                         setSelectedProject(completedProjects[0] || null);
                       }}
                       className="bg-slate-50 p-2.5 rounded-xl text-center flex flex-col justify-center hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 transition cursor-pointer group shadow-3xs"

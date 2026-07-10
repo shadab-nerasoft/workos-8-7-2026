@@ -58,4 +58,47 @@ export const authApi = {
     // LATER: await fetch("/api/auth/logout", { method: "POST" });
     useAuthStore.getState().logout();
   },
+
+  /**
+   * Mock signup: registers the user in the employee store so future
+   * logins work, then signs them in.
+   */
+  async signup(data: {
+    fullName: string;
+    email: string;
+    employeeId?: string;
+    department?: string;
+    designation?: string;
+    mobileNumber?: string;
+  }): Promise<User> {
+    // LATER: const res = await fetch("/api/auth/signup", { method: "POST", body: JSON.stringify(data) });
+    const employeeStore = useEmployeeStore.getState();
+    const normalized = data.email.trim().toLowerCase();
+
+    const existing = employeeStore
+      .getAllUsers()
+      .find((u) => u.email.toLowerCase() === normalized);
+    if (existing) {
+      throw new Error("An account with that email already exists.");
+    }
+
+    const newUser: User = {
+      id: data.employeeId || `EMP-${Date.now()}`,
+      name: data.fullName,
+      role: "employee",
+      title: data.designation || "",
+      email: data.email,
+      teamId: "t-general",
+      avatar: data.fullName.charAt(0).toUpperCase(),
+      utilization: 0,
+      performance: 0,
+      department: data.department,
+      designation: data.designation,
+      mobileNumber: data.mobileNumber,
+    };
+
+    employeeStore.createUser(newUser);
+    useAuthStore.getState().login(newUser);
+    return newUser;
+  },
 };
