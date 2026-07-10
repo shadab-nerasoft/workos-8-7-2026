@@ -1,10 +1,9 @@
-import { AppShell } from "@/src/components/common/app-shell";
-import { EmployeesSection } from "@/src/components/sections/employees-section";
+import EmployeesPageClient from "./page-client";
+
+export const metadata = {
+  title: "Employees | WorkOS",
+};
 
 export default function EmployeesPage() {
-  return (
-    <AppShell>
-      <EmployeesSection />
-    </AppShell>
-  );
+  return <EmployeesPageClient />;
 }

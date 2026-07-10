@@ -2,27 +2,37 @@
 
 import { useMemo, useState } from "react";
 import { Add, ArrowRight2 } from "iconsax-react";
-import { useTaskStore, useEmployeeStore, useAuthStore } from "@/src/store";
 import { TaskBoardCard } from "./task-board-card";
-import { TaskModal } from "./task-modal";
 import { StatusTasksModal } from "./status-tasks-modal";
 import { titleCase } from "@/src/lib/utils/format";
-import type { TaskStatus, Task } from "@/src/types";
+import type { TaskStatus, Task, User } from "@/src/types";
 
 const boardColumns: TaskStatus[] = ["todo", "in-progress", "completed"];
 
-export function ProjectBoardTab({ projectId }: { projectId: string }) {
-  const { currentUser } = useAuthStore();
-  const getTasksByProject = useTaskStore((s) => s.getTasksByProject);
-  const moveTask = useTaskStore((s) => s.moveTask);
-  const users = useEmployeeStore((s) => s.usersList);
+interface ProjectBoardTabProps {
+  /** Tasks pre-scoped to the project by the page. */
+  tasks: Task[];
+  users: User[];
+  /** Permission check for dragging, computed by the page. */
+  canDragTask: (task: Task) => boolean;
+  /** Called when a task is dropped in a new column. The page owns persistence. */
+  onTaskMove: (taskId: string, status: TaskStatus) => void;
+  /** Called to open the create modal. The page owns the modal. */
+  onCreateTask: () => void;
+  /** Called to open the edit modal for a task. The page owns the modal. */
+  onEditTask: (task: Task) => void;
+}
 
-  const tasks = getTasksByProject(projectId);
+/** Pure presentational kanban board. Data, permissions, and modals come from the page. */
+export function ProjectBoardTab({
+  tasks,
+  users,
+  canDragTask,
+  onTaskMove,
+  onCreateTask,
+  onEditTask,
+}: ProjectBoardTabProps) {
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
-
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   // Status View All Modal State
   const [viewAllStatus, setViewAllStatus] = useState<TaskStatus | null>(null);
@@ -32,8 +42,7 @@ export function ProjectBoardTab({ projectId }: { projectId: string }) {
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
-    // If it's an employee, they can only drag their own tasks
-    if (currentUser?.role === "employee" && task.assigneeId !== currentUser.id) {
+    if (!canDragTask(task)) {
       e.preventDefault();
       return;
     }
@@ -63,21 +72,11 @@ export function ProjectBoardTab({ projectId }: { projectId: string }) {
   const handleDrop = (e: React.DragEvent, status: TaskStatus) => {
     e.preventDefault();
     if (draggedTaskId) {
-      moveTask(draggedTaskId, status);
+      onTaskMove(draggedTaskId, status);
     }
     setDraggedTaskId(null);
     setDragOverColumn(null);
     document.body.classList.remove('cursor-grabbing');
-  };
-
-  const openCreateModal = () => {
-    setEditingTask(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (task: Task) => {
-    setEditingTask(task);
-    setIsModalOpen(true);
   };
 
   const grouped = useMemo(
@@ -133,15 +132,15 @@ export function ProjectBoardTab({ projectId }: { projectId: string }) {
                   {visibleTasks.map((task) => (
                     <div
                       key={task.id}
-                      draggable={currentUser?.role !== "employee" || task.assigneeId === currentUser?.id}
+                      draggable={canDragTask(task)}
                       onDragStart={(e) => handleDragStart(e, task)}
                       onDragEnd={handleDragEnd}
-                      className={`transition-opacity ${draggedTaskId === task.id ? "opacity-30 cursor-grabbing" : "opacity-100 cursor-grab"} ${currentUser?.role === "employee" && task.assigneeId !== currentUser?.id ? "cursor-not-allowed" : ""}`}
+                      className={`transition-opacity ${draggedTaskId === task.id ? "opacity-30 cursor-grabbing" : "opacity-100 cursor-grab"} ${!canDragTask(task) ? "cursor-not-allowed" : ""}`}
                     >
                       <TaskBoardCard
                         task={task}
                         assignee={usersById.get(task.assigneeId)}
-                        onClick={() => openEditModal(task)}
+                        onClick={() => onEditTask(task)}
                       />
                     </div>
                   ))}
@@ -159,7 +158,7 @@ export function ProjectBoardTab({ projectId }: { projectId: string }) {
 
                   {/* Add Task Button inside column */}
                   <button
-                    onClick={openCreateModal}
+                    onClick={onCreateTask}
                     className="group mt-auto flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white/50 py-3 pl-3 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur-md transition-all hover:border-primary-400 hover:bg-white/80 hover:text-primary-700"
                   >
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-primary-600 shadow-sm transition-transform group-hover:scale-110">
@@ -174,20 +173,14 @@ export function ProjectBoardTab({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      <TaskModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        task={editingTask}
-        projectId={projectId}
-      />
-
       {viewAllStatus && (
         <StatusTasksModal
           isOpen={!!viewAllStatus}
           onClose={() => setViewAllStatus(null)}
           status={viewAllStatus}
-          projectId={projectId}
-          onEditTask={openEditModal}
+          projectTasks={tasks}
+          users={users}
+          onEditTask={onEditTask}
         />
       )}
     </>

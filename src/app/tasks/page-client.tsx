@@ -267,6 +267,19 @@ export default function TasksPage() {
             }}
             task={editingTask}
             projectId={modalProjectId}
+            users={usersList}
+            availableProjects={projectsList}
+            isReadOnly={
+              !!editingTask && !can(currentUser, "task:edit", { task: editingTask })
+            }
+            lockAssigneeTo={currentUser.role === "employee" ? currentUser.id : null}
+            onSubmit={(values) => {
+              if (editingTask) {
+                void tasksApi.updateTask(editingTask.id, values);
+              } else {
+                void tasksApi.createTask(values);
+              }
+            }}
           />
         )}
       </div>

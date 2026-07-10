@@ -1,32 +1,55 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/src/components/ui/modal";
 import { FormField, Input, TextArea, Select } from "@/src/components/ui/form-field";
-import { useAuthStore, useEmployeeStore, useProjectStore, useTaskStore } from "@/src/store";
 import { getAssigneeManager } from "@/src/lib/utils/task-manager";
-import type { Task, TaskStatus, Priority } from "@/src/types";
+import type { Task, TaskStatus, Priority, User, Project } from "@/src/types";
+
+export interface TaskModalSubmitValues {
+  title: string;
+  description: string;
+  projectId: string;
+  status: TaskStatus;
+  priority: Priority;
+  deadline: string;
+  assigneeId: string;
+  managerId?: string;
+}
 
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   task?: Task | null;
   projectId: string;
+  /** Users that can be assigned, provided by the page. */
+  users: User[];
+  /** Projects the current user may move this task into, pre-scoped by the page. */
+  availableProjects: Project[];
+  /** True when the viewer may not modify this task (computed by the page via permissions). */
+  isReadOnly?: boolean;
+  /** True when the assignee field is locked to the current user (employees). */
+  lockAssigneeTo?: string | null;
+  /** Called with the final values on submit. The page owns persistence. */
+  onSubmit: (values: TaskModalSubmitValues) => void;
 }
 
-export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) {
-  const { currentUser } = useAuthStore();
-  const allUsers = useEmployeeStore((s) => s.getAllUsers());
-  const allProjects = useProjectStore((s) => s.getAllProjects());
-  const allTasks = useTaskStore((s) => s.tasks);
-  const createTask = useTaskStore((s) => s.createTask);
-  const updateTask = useTaskStore((s) => s.updateTask);
-
+/**
+ * Pure presentational task create/edit modal.
+ * All data, scoping, permissions, and persistence are owned by the page.
+ */
+export function TaskModal({
+  isOpen,
+  onClose,
+  task,
+  projectId,
+  users,
+  availableProjects,
+  isReadOnly = false,
+  lockAssigneeTo = null,
+  onSubmit,
+}: TaskModalProps) {
   const isEdit = !!task;
-  const isEmployee = currentUser?.role === "employee";
-  
-  // If editing an existing task, an employee can only edit it if they are the assignee
-  const isReadOnly = isEdit && isEmployee && task.assigneeId !== currentUser?.id;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -35,41 +58,7 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
   const [deadline, setDeadline] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState(projectId);
-  const manager = getAssigneeManager(assigneeId, allUsers);
-
-  const availableProjects = useMemo(() => {
-    if (!currentUser) {
-      return [];
-    }
-
-    const currentProject = allProjects.find((project) => project.id === (task?.projectId ?? projectId));
-
-    if (currentUser.role === "admin") {
-      return allProjects;
-    }
-
-    if (currentUser.role === "manager") {
-      const managerProjects = allProjects.filter(
-        (project) => project.ownerId === currentUser.id || project.teamId === currentUser.teamId,
-      );
-
-      return currentProject && !managerProjects.some((project) => project.id === currentProject.id)
-        ? [currentProject, ...managerProjects]
-        : managerProjects;
-    }
-
-    const assignedProjectIds = new Set(
-      allTasks
-        .filter((userTask) => userTask.assigneeId === currentUser.id)
-        .map((userTask) => userTask.projectId),
-    );
-
-    const employeeProjects = allProjects.filter((project) => assignedProjectIds.has(project.id));
-
-    return currentProject && !employeeProjects.some((project) => project.id === currentProject.id)
-      ? [currentProject, ...employeeProjects]
-      : employeeProjects;
-  }, [allProjects, allTasks, currentUser, projectId, task]);
+  const manager = getAssigneeManager(assigneeId, users);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,48 +78,30 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
         // default deadline to one week from today
         const nextWeek = new Date();
         nextWeek.setDate(nextWeek.getDate() + 7);
-        setDeadline(nextWeek.toISOString().split('T')[0]);
-        // Employees can only assign to themselves
-        setAssigneeId(isEmployee && currentUser ? currentUser.id : "");
+        setDeadline(nextWeek.toISOString().split("T")[0]);
+        setAssigneeId(lockAssigneeTo ?? "");
         setSelectedProjectId(availableProjects[0]?.id ?? projectId);
       }
     }
-  }, [availableProjects, isOpen, projectId, task, isEmployee, currentUser]);
+  }, [availableProjects, isOpen, projectId, task, lockAssigneeTo]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || !selectedProjectId) return;
 
-    if (isEdit) {
-      updateTask(task.id, {
-        title,
-        description,
-        projectId: selectedProjectId,
-        status,
-        priority,
-        deadline,
-        assigneeId,
-        managerId: manager?.id,
-      });
-    } else {
-      const finalAssigneeId = isEmployee && currentUser ? currentUser.id : assigneeId;
-      const finalManager = getAssigneeManager(finalAssigneeId, allUsers);
+    const finalAssigneeId = lockAssigneeTo ?? assigneeId;
+    const finalManager = getAssigneeManager(finalAssigneeId, users);
 
-      createTask({
-        id: `t-${Date.now()}`,
-        title,
-        description,
-        projectId: selectedProjectId,
-        assigneeId: finalAssigneeId,
-        managerId: finalManager?.id,
-        status,
-        priority,
-        deadline,
-        comments: 0,
-        attachments: 0,
-        createdAt: new Date().toISOString(),
-      });
-    }
+    onSubmit({
+      title,
+      description,
+      projectId: selectedProjectId,
+      status,
+      priority,
+      deadline,
+      assigneeId: finalAssigneeId,
+      managerId: finalManager?.id,
+    });
     onClose();
   };
 
@@ -227,11 +198,11 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
               id="assignee"
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
-              disabled={isReadOnly || isEmployee} // Employees cannot change assignee
+              disabled={isReadOnly || !!lockAssigneeTo}
               required
             >
               <option value="" disabled>Select an assignee</option>
-              {allUsers.map((user) => (
+              {users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name} ({user.role})
                 </option>

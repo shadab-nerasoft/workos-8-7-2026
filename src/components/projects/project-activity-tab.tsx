@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useEmployeeStore, useActivityStore } from "@/src/store";
 import { formatDate } from "@/src/lib/utils/format";
+import type { Activity, User } from "@/src/types";
 
-export function ProjectActivityTab({ projectId }: { projectId: string }) {
-  const users = useEmployeeStore((s) => s.usersList);
-  const activities = useActivityStore((s) => s.activities).filter(
-    (act) => act.projectId === projectId
-  );
+/** Pure presentational activity feed. Activities are pre-scoped to the project by the page. */
+export function ProjectActivityTab({ activities, users }: { activities: Activity[]; users: User[] }) {
 
   const [visibleCount, setVisibleCount] = useState(10);
   const displayedActivities = activities.slice(0, visibleCount);

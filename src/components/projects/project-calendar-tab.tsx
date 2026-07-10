@@ -1,20 +1,22 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useTaskStore, useEmployeeStore } from "@/src/store";
-import { TaskModal } from "./task-modal";
 import { ArrowLeft2, ArrowRight2 } from "iconsax-react";
-import type { Task } from "@/src/types";
+import type { Task, User } from "@/src/types";
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function ProjectCalendarTab({ projectId }: { projectId: string }) {
-  const getTasksByProject = useTaskStore((s) => s.getTasksByProject);
-  const users = useEmployeeStore((s) => s.usersList);
-  const tasks = getTasksByProject(projectId);
+interface ProjectCalendarTabProps {
+  /** Tasks pre-scoped to the project by the page. */
+  tasks: Task[];
+  users: User[];
+  /** Called when a task is clicked. The page owns the edit modal. */
+  onTaskSelect?: (task: Task) => void;
+}
 
+/** Pure presentational month calendar. Data and modal handling come from the page. */
+export function ProjectCalendarTab({ tasks, users, onTaskSelect }: ProjectCalendarTabProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -126,7 +128,7 @@ export function ProjectCalendarTab({ projectId }: { projectId: string }) {
                     return (
                       <div
                         key={task.id}
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => onTaskSelect?.(task)}
                         className="cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-sm transition-all hover:border-primary-400 hover:shadow"
                       >
                         <p className="line-clamp-1 text-xs font-semibold text-slate-700">
@@ -150,14 +152,6 @@ export function ProjectCalendarTab({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {selectedTask && (
-        <TaskModal
-          isOpen={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
-          task={selectedTask}
-          projectId={projectId}
-        />
-      )}
     </div>
   );
 }

@@ -2,32 +2,34 @@
 
 import { useMemo, useState } from "react";
 import { Modal } from "@/src/components/ui/modal";
-import { useTaskStore, useEmployeeStore } from "@/src/store";
 import { PriorityBadge } from "@/src/components/ui/badge";
 import { formatDate, titleCase } from "@/src/lib/utils/format";
 import { ArrowLeft2, ArrowRight2 } from "iconsax-react";
-import type { Task, TaskStatus } from "@/src/types";
+import type { Task, TaskStatus, User } from "@/src/types";
 
 interface StatusTasksModalProps {
   isOpen: boolean;
   onClose: () => void;
   status: TaskStatus;
-  projectId: string;
+  /** Tasks pre-scoped to the project by the page. */
+  projectTasks: Task[];
+  users: User[];
   onEditTask: (task: Task) => void;
 }
 
 const ITEMS_PER_PAGE = 5;
 
-export function StatusTasksModal({ isOpen, onClose, status, projectId, onEditTask }: StatusTasksModalProps) {
-  const getTasksByProject = useTaskStore((s) => s.getTasksByProject);
-  const users = useEmployeeStore((s) => s.usersList);
-  
+/** Pure presentational "view all by status" modal. Data comes from the page. */
+export function StatusTasksModal({ isOpen, onClose, status, projectTasks, users, onEditTask }: StatusTasksModalProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
-  const tasks = useMemo(() => {
-    const allProjectTasks = getTasksByProject(projectId);
-    return allProjectTasks.filter((t) => t.status === status || (status === "completed" && t.status === "review"));
-  }, [getTasksByProject, projectId, status]);
+  const tasks = useMemo(
+    () =>
+      projectTasks.filter(
+        (t) => t.status === status || (status === "completed" && t.status === "review"),
+      ),
+    [projectTasks, status],
+  );
 
   const totalPages = Math.ceil(tasks.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;

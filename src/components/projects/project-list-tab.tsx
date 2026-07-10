@@ -1,15 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { useTaskStore, useEmployeeStore } from "@/src/store";
 import { TaskStatusBadge, PriorityBadge } from "@/src/components/ui/badge";
 import { formatDate } from "@/src/lib/utils/format";
+import type { Task, User } from "@/src/types";
 
-export function ProjectListTab({ projectId }: { projectId: string }) {
-  const getTasksByProject = useTaskStore((s) => s.getTasksByProject);
-  const users = useEmployeeStore((s) => s.usersList);
-  
-  const tasks = getTasksByProject(projectId);
+/** Pure presentational list view. Tasks are pre-scoped to the project by the page. */
+export function ProjectListTab({ tasks, users }: { tasks: Task[]; users: User[] }) {
 
   // Group tasks by assignee
   const groupedTasks = useMemo(() => {
