@@ -13,7 +13,7 @@ import type { TaskStatus, Task } from "@/src/types";
 
 export default function ManagerTasksPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
-  const tasks = useTaskStore((s) => s.tasksList);
+  const tasks = useTaskStore((s) => s.tasks);
   const usersList = useEmployeeStore((s) => s.usersList);
   const projects = useProjectStore((s) => s.projects);
   const updateTask = useTaskStore((s) => s.updateTask);

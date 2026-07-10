@@ -29,6 +29,10 @@ interface TaskDetailModalProps {
   attachments?: TaskAttachment[];
   activities?: TaskActivity[];
   currentUserId?: string;
+  /** Whether the current user may edit this task (computed by the page via permissions). */
+  canEdit?: boolean;
+  /** Whether the current user may delete this task (computed by the page via permissions). */
+  canDelete?: boolean;
 }
 
 export function TaskDetailModal({
@@ -48,6 +52,8 @@ export function TaskDetailModal({
   attachments = [],
   activities = [],
   currentUserId = "current-user",
+  canEdit = true,
+  canDelete = true,
 }: TaskDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>("details");
 
@@ -96,19 +102,23 @@ export function TaskDetailModal({
                 {projectName && <p className="mt-1 text-sm text-slate-600">{projectName}</p>}
               </div>
               <div className="flex gap-2">
-                <button className="rounded-lg p-2 hover:bg-slate-100" title="Edit task">
-                  <Edit size={18} className="text-slate-600" />
-                </button>
-                <button
-                  onClick={() => {
-                    onDelete?.(task.id);
-                    onClose();
-                  }}
-                  className="rounded-lg p-2 hover:bg-red-50"
-                  title="Delete task"
-                >
-                  <Trash size={18} className="text-red-600" />
-                </button>
+                {canEdit && (
+                  <button className="rounded-lg p-2 hover:bg-slate-100" title="Edit task">
+                    <Edit size={18} className="text-slate-600" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={() => {
+                      onDelete?.(task.id);
+                      onClose();
+                    }}
+                    className="rounded-lg p-2 hover:bg-red-50"
+                    title="Delete task"
+                  >
+                    <Trash size={18} className="text-red-600" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -194,14 +204,16 @@ export function TaskDetailModal({
 
         {/* Actions */}
         <div className="flex gap-2 border-t border-slate-200 pt-4">
-          <button
-            onClick={() => {
-              onUpdate?.(task.id, { status: task.status === "completed" ? "in-progress" : "completed" });
-            }}
-            className="flex-1 rounded-lg bg-primary-500 px-4 py-2 font-medium text-white hover:bg-primary-600"
-          >
-            {task.status === "completed" ? "Mark Incomplete" : "Mark Complete"}
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => {
+                onUpdate?.(task.id, { status: task.status === "completed" ? "in-progress" : "completed" });
+              }}
+              className="flex-1 rounded-lg bg-primary-500 px-4 py-2 font-medium text-white hover:bg-primary-600"
+            >
+              {task.status === "completed" ? "Mark Incomplete" : "Mark Complete"}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"

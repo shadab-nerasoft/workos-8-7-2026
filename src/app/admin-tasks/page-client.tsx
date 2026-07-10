@@ -12,7 +12,7 @@ import { getTaskManager } from "@/src/lib/utils/task-manager";
 import type { TaskStatus, Task } from "@/src/types";
 
 export default function AdminTasksPage() {
-  const tasks = useTaskStore((s) => s.tasksList);
+  const tasks = useTaskStore((s) => s.tasks);
   const usersList = useEmployeeStore((s) => s.usersList);
   const projects = useProjectStore((s) => s.projects);
   const teamsList = useTeamStore((s) => s.teamsList);

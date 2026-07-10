@@ -4,13 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/src/components/common/auth-shell";
-import { useAuthStore, useEmployeeStore } from "@/src/store";
+import { authApi, DEMO_PASSWORD } from "@/src/services";
 import { Eye, EyeOff, User, Lock, ShieldCheck, Briefcase } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
-  const allUsers = useEmployeeStore((s) => s.getAllUsers());
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -23,51 +21,31 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
-    // Mock login logic
-    setTimeout(() => {
-      const user = allUsers.find(
-        (u) => (u.email === identifier || u.id === identifier)
-      );
-
-      if (user && (password === "password123" || password === "admin123")) {
-        // Handle admin specifically if password is admin123 and user is admin
-        if (password === "admin123" && user.role !== "admin") {
-          setError("Invalid credentials for this role.");
-          setIsLoading(false);
-          return;
-        }
-
-        login(user);
-        router.push("/");
-      } else {
-        setError("Invalid identifier or password. Try 'password123'.");
-      }
+    try {
+      await authApi.login(identifier, password);
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleQuickLogin = (role: "admin" | "manager" | "employee") => {
+  const handleQuickLogin = async (role: "admin" | "manager" | "employee") => {
     setError(null);
     setIsLoading(true);
 
-    // Find first user matching the role
-    const targetUser = allUsers.find((u) => u.role === role);
-    if (!targetUser) {
-      setError(`No user found with the role: ${role}`);
-      setIsLoading(false);
-      return;
-    }
-
-    // Set fields for visual feedback
-    setIdentifier(targetUser.email);
-    setPassword("password123");
-
-    // Perform login with delay to show the animation
-    setTimeout(() => {
-      login(targetUser);
+    try {
+      const user = await authApi.loginAsRole(role);
+      // Reflect the demo credentials in the form for visual feedback
+      setIdentifier(user.email);
+      setPassword(DEMO_PASSWORD);
       router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -161,8 +139,12 @@ export default function LoginPage() {
         </button>
 
         <div className="mt-6 pt-6 border-t border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center mb-3">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center mb-1">
             Quick Demo Login
+          </p>
+          <p className="text-xs text-slate-400 text-center mb-3">
+            {"All demo accounts use the password "}
+            <span className="font-mono font-semibold text-slate-500">{DEMO_PASSWORD}</span>
           </p>
           <div className="grid grid-cols-3 gap-3">
             <button

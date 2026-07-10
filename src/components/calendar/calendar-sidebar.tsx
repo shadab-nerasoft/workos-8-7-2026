@@ -32,7 +32,7 @@ export function CalendarSidebar({
 }: CalendarSidebarProps) {
   const { currentUser } = useAuthStore();
   const users = useEmployeeStore((s) => s.usersList);
-  const allTasks = useTaskStore((s) => s.tasksList);
+  const allTasks = useTaskStore((s) => s.tasks);
 
   const [scheduleOpen, setScheduleOpen] = useState(true);
   const [categoriesOpen, setCategoriesOpen] = useState(true);

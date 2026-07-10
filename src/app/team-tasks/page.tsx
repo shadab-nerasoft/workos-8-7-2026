@@ -1,5 +1,8 @@
-import TeamTasksPage from './page-client';
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return <TeamTasksPage />;
+/**
+ * @deprecated Consolidated into the role-aware /tasks page.
+ */
+export default function TeamTasksPage() {
+  redirect("/tasks");
 }

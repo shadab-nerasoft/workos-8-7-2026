@@ -19,7 +19,7 @@ type ViewMode = "list" | "kanban";
 export default function TeamTasksPage() {
   const router = useRouter();
   const { currentUser } = useAuthStore();
-  const tasks = useTaskStore((s) => s.tasksList);
+  const tasks = useTaskStore((s) => s.tasks);
   const usersList = useEmployeeStore((s) => s.usersList);
   const projects = useProjectStore((s) => s.projects);
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -31,10 +31,6 @@ export default function TeamTasksPage() {
       router.replace("/");
     }
   }, [currentUser, router]);
-
-  if (currentUser?.role === "employee") {
-    return null;
-  }
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -91,6 +87,11 @@ export default function TeamTasksPage() {
       ),
     [projects]
   );
+
+  // All hooks must run before this conditional return (rules of hooks).
+  if (currentUser?.role === "employee") {
+    return null;
+  }
 
   return (
     <AppShell>

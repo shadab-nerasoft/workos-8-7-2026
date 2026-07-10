@@ -8,7 +8,6 @@ import { tasks } from "@/src/mock-data/tasks";
 import { dailyReports } from "@/src/mock-data/daily-reports";
 import { activity } from "@/src/mock-data/analytics";
 import {
-  useAuthStore,
   useEmployeeStore,
   useTeamStore,
   useProjectStore,
@@ -30,15 +29,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     useTaskStore.getState().hydrate(tasks);
     useDailyReportStore.getState().hydrate(dailyReports);
     useActivityStore.getState().hydrate(activity);
-    
-    // Set a default user (e.g. an admin) if not logged in
-    const authStore = useAuthStore.getState();
-    if (!authStore.isAuthenticated) {
-      const defaultUser = users.find((u) => u.role === "admin");
-      if (defaultUser) {
-        authStore.login(defaultUser);
-      }
-    }
 
     initialized.current = true;
   }, []);

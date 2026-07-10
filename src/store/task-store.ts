@@ -4,8 +4,8 @@ import { useAuthStore } from "./auth-store";
 import { useActivityStore } from "./activity-store";
 
 interface TaskState {
-  tasks: Map<string, Task>;
-  tasksList: Task[];
+  /** Single source of truth for active (non-archived) tasks. */
+  tasks: Task[];
   comments: Map<string, TaskComment[]>;
   attachments: Map<string, TaskAttachment[]>;
   activities: Map<string, TaskActivity[]>;
@@ -72,9 +72,20 @@ interface TaskState {
   applyFilter: (filter: TaskSearchFilter) => Task[];
 }
 
+function logCompletionActivity(task: Task) {
+  const currentUser = useAuthStore.getState().currentUser;
+  if (currentUser) {
+    useActivityStore.getState().addActivity({
+      actorId: currentUser.id,
+      action: "completed task",
+      subject: task.title,
+      projectId: task.projectId,
+    });
+  }
+}
+
 export const useTaskStore = create<TaskState>((set, get) => ({
-  tasks: new Map(),
-  tasksList: [],
+  tasks: [],
   comments: new Map(),
   attachments: new Map(),
   activities: new Map(),
@@ -85,108 +96,77 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   notifications: [],
   savedFilters: [],
 
-  hydrate: (tasks) =>
-    set({ tasks: new Map(tasks.map((t) => [t.id, t])), tasksList: tasks }),
+  hydrate: (tasks) => set({ tasks }),
 
   createTask: (task) =>
-    set((state) => {
-      const next = new Map(state.tasks);
-      next.set(task.id, task);
-      return { tasks: next, tasksList: Array.from(next.values()) };
-    }),
+    set((state) => ({ tasks: [...state.tasks, task] })),
 
   updateTask: (id, updates) =>
     set((state) => {
-      const existing = state.tasks.get(id);
+      const existing = state.tasks.find((t) => t.id === id);
       if (!existing) return state;
 
-      // Log activity if task is marked completed
       if (updates.status === "completed" && existing.status !== "completed") {
-        const currentUser = useAuthStore.getState().currentUser;
-        if (currentUser) {
-          useActivityStore.getState().addActivity({
-            actorId: currentUser.id,
-            action: "completed task",
-            subject: existing.title,
-            projectId: existing.projectId,
-          });
-        }
+        logCompletionActivity(existing);
       }
 
-      const next = new Map(state.tasks);
-      next.set(id, { ...existing, ...updates });
-      return { tasks: next, tasksList: Array.from(next.values()) };
+      return {
+        tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      };
     }),
 
   deleteTask: (id) =>
-    set((state) => {
-      const next = new Map(state.tasks);
-      next.delete(id);
-      return { tasks: next, tasksList: Array.from(next.values()) };
-    }),
+    set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
 
   moveTask: (taskId, newStatus) =>
     set((state) => {
-      const task = state.tasks.get(taskId);
+      const task = state.tasks.find((t) => t.id === taskId);
       if (!task || task.status === newStatus) return state;
 
-      // Log activity if task is marked completed
       if (newStatus === "completed") {
-        const currentUser = useAuthStore.getState().currentUser;
-        if (currentUser) {
-          useActivityStore.getState().addActivity({
-            actorId: currentUser.id,
-            action: "completed task",
-            subject: task.title,
-            projectId: task.projectId,
-          });
-        }
+        logCompletionActivity(task);
       }
 
-      const next = new Map(state.tasks);
-      next.set(taskId, { ...task, status: newStatus });
-      return { tasks: next, tasksList: Array.from(next.values()) };
+      return {
+        tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
+      };
     }),
 
   assignTask: (taskId, userId) =>
-    set((state) => {
-      const task = state.tasks.get(taskId);
-      if (!task) return state;
-      const next = new Map(state.tasks);
-      next.set(taskId, { ...task, assigneeId: userId });
-      return { tasks: next, tasksList: Array.from(next.values()) };
-    }),
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, assigneeId: userId } : t)),
+    })),
 
-  getTaskById: (id) => get().tasks.get(id),
+  getTaskById: (id) => get().tasks.find((t) => t.id === id),
 
   getTasksByProject: (projectId) =>
-    get().tasksList.filter((t) => t.projectId === projectId),
+    get().tasks.filter((t) => t.projectId === projectId),
 
   getTasksByAssignee: (assigneeId) =>
-    get().tasksList.filter((t) => t.assigneeId === assigneeId),
+    get().tasks.filter((t) => t.assigneeId === assigneeId),
 
   getTasksByStatus: (status) =>
-    get().tasksList.filter((t) => t.status === status),
+    get().tasks.filter((t) => t.status === status),
 
-  getAllTasks: () => get().tasksList,
+  getAllTasks: () => get().tasks,
 
   // Manager & Admin query methods
   getTeamTasks: (teamMemberIds) =>
-    get().tasksList.filter((t) => teamMemberIds.includes(t.assigneeId)),
+    get().tasks.filter((t) => teamMemberIds.includes(t.assigneeId)),
 
   getOverdueTasks: (beforeDate = new Date()) =>
-    get().tasksList.filter((t) => t.status !== "completed" && t.deadline && new Date(t.deadline) < beforeDate),
+    get().tasks.filter((t) => t.status !== "completed" && t.deadline && new Date(t.deadline) < beforeDate),
 
   searchTasks: (query) => {
     const lowerQuery = query.toLowerCase();
-    return get().tasksList.filter((t) => t.title.toLowerCase().includes(lowerQuery) || t.description?.toLowerCase().includes(lowerQuery));
+    return get().tasks.filter((t) => t.title.toLowerCase().includes(lowerQuery) || t.description?.toLowerCase().includes(lowerQuery));
   },
 
   getTasksByPriority: (priority) =>
-    get().tasksList.filter((t) => t.priority === priority),
+    get().tasks.filter((t) => t.priority === priority),
 
   getTaskStats: () => {
-    const tasks = get().tasksList;
+    const tasks = get().tasks;
     return {
       total: tasks.length,
       completed: tasks.filter((t) => t.status === "completed").length,
@@ -196,7 +176,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   filterTasks: (filters) => {
-    let filtered = get().tasksList;
+    let filtered = get().tasks;
 
     if (filters.status) {
       filtered = filtered.filter((t) => t.status === filters.status);
@@ -219,14 +199,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const next = new Map(state.comments);
       const existing = next.get(taskId) || [];
       next.set(taskId, [...existing, comment]);
-      
-      const task = state.tasks.get(taskId);
-      if (task) {
-        const tasks = new Map(state.tasks);
-        tasks.set(taskId, { ...task, comments: existing.length + 1 });
-        return { comments: next, tasks };
-      }
-      return { comments: next };
+
+      return {
+        comments: next,
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, comments: existing.length + 1 } : t
+        ),
+      };
     }),
 
   updateComment: (taskId, commentId, content) =>
@@ -244,14 +223,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const comments = next.get(taskId) || [];
       const filtered = comments.filter((c) => c.id !== commentId);
       next.set(taskId, filtered);
-      
-      const task = state.tasks.get(taskId);
-      if (task && task.comments > 0) {
-        const tasks = new Map(state.tasks);
-        tasks.set(taskId, { ...task, comments: task.comments - 1 });
-        return { comments: next, tasks };
-      }
-      return { comments: next };
+
+      return {
+        comments: next,
+        tasks: state.tasks.map((t) =>
+          t.id === taskId && t.comments > 0 ? { ...t, comments: t.comments - 1 } : t
+        ),
+      };
     }),
 
   getComments: (taskId) => get().comments.get(taskId) || [],
@@ -262,14 +240,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const next = new Map(state.attachments);
       const existing = next.get(taskId) || [];
       next.set(taskId, [...existing, attachment]);
-      
-      const task = state.tasks.get(taskId);
-      if (task) {
-        const tasks = new Map(state.tasks);
-        tasks.set(taskId, { ...task, attachments: existing.length + 1 });
-        return { attachments: next, tasks };
-      }
-      return { attachments: next };
+
+      return {
+        attachments: next,
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, attachments: existing.length + 1 } : t
+        ),
+      };
     }),
 
   deleteAttachment: (taskId, attachmentId) =>
@@ -278,14 +255,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const attachments = next.get(taskId) || [];
       const filtered = attachments.filter((a) => a.id !== attachmentId);
       next.set(taskId, filtered);
-      
-      const task = state.tasks.get(taskId);
-      if (task && task.attachments > 0) {
-        const tasks = new Map(state.tasks);
-        tasks.set(taskId, { ...task, attachments: task.attachments - 1 });
-        return { attachments: next, tasks };
-      }
-      return { attachments: next };
+
+      return {
+        attachments: next,
+        tasks: state.tasks.map((t) =>
+          t.id === taskId && t.attachments > 0 ? { ...t, attachments: t.attachments - 1 } : t
+        ),
+      };
     }),
 
   getAttachments: (taskId) => get().attachments.get(taskId) || [],
@@ -379,11 +355,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   getLabels: () => get().labels,
 
-  // Archive methods
+  // Archive methods — archiving removes the task from the active list;
+  // restoring puts it back. The task lives in exactly one of the two lists.
   archiveTask: (taskId, userId, reason) =>
     set((state) => {
-      const task = state.tasks.get(taskId);
-      if (!task) return {};
+      const task = state.tasks.find((t) => t.id === taskId);
+      if (!task) return state;
       const archived: ArchivedTask = {
         id: `archived-${taskId}`,
         task,
@@ -392,14 +369,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         reason,
       };
       return {
+        tasks: state.tasks.filter((t) => t.id !== taskId),
         archivedTasks: [...state.archivedTasks, archived],
       };
     }),
 
   restoreTask: (taskId) =>
-    set((state) => ({
-      archivedTasks: state.archivedTasks.filter((a) => a.task.id !== taskId),
-    })),
+    set((state) => {
+      const archived = state.archivedTasks.find((a) => a.task.id === taskId);
+      if (!archived) return state;
+      return {
+        tasks: [...state.tasks, archived.task],
+        archivedTasks: state.archivedTasks.filter((a) => a.task.id !== taskId),
+      };
+    }),
 
   getArchivedTasks: () => get().archivedTasks,
 
@@ -435,7 +418,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   getSavedFilters: () => get().savedFilters,
 
   applyFilter: (filter) => {
-    const tasks = get().tasksList;
+    const tasks = get().tasks;
     return tasks.filter((task) => {
       return filter.conditions.every((condition) => {
         switch (condition.field) {

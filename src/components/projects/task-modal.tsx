@@ -18,7 +18,7 @@ export function TaskModal({ isOpen, onClose, task, projectId }: TaskModalProps) 
   const { currentUser } = useAuthStore();
   const allUsers = useEmployeeStore((s) => s.getAllUsers());
   const allProjects = useProjectStore((s) => s.getAllProjects());
-  const allTasks = useTaskStore((s) => s.tasksList);
+  const allTasks = useTaskStore((s) => s.tasks);
   const createTask = useTaskStore((s) => s.createTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
