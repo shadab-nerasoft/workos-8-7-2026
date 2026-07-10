@@ -1,42 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SearchNormal1, Grid5, RowVertical } from "iconsax-react";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { ProjectsGrid } from "@/src/components/ui/projects-grid";
 import { ProjectList } from "@/src/components/ui/project-list";
-import { useAuthStore, useProjectStore, useEmployeeStore, useTeamStore, useTaskStore } from "@/src/store";
+import type { Project, Team, User } from "@/src/types";
 
-export function ProjectsSection() {
+interface ProjectsSectionProps {
+  /** Projects already scoped to the current user's visibility by the page. */
+  projects: Project[];
+  teams: Team[];
+  users: User[];
+}
+
+/**
+ * Pure presentational projects browser. Role-based scoping is the
+ * responsibility of the page (composition root) — this component only
+ * handles local UI state (search query, grid/list view).
+ */
+export function ProjectsSection({ projects, teams, users }: ProjectsSectionProps) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
 
-  const { currentUser } = useAuthStore();
-  const allProjects = useProjectStore((s) => s.getAllProjects());
-  const allTeams = useTeamStore((s) => s.getAllTeams());
-  const allUsers = useEmployeeStore((s) => s.getAllUsers());
-  const allTasks = useTaskStore((s) => s.getAllTasks());
-
-  const permissions = currentUser?.role === "admin" || currentUser?.role === "manager"
-    ? { canViewAll: true }
-    : { canViewAll: false };
-
-  let projects = allProjects;
-  if (currentUser?.role === "employee") {
-    projects = allProjects.filter((p) =>
-      allTasks.some((t) => t.projectId === p.id && t.assigneeId === currentUser.id)
-    );
-  } else if (!permissions.canViewAll) {
-    projects = allProjects.filter((p) => p.ownerId === currentUser?.id || p.teamId === currentUser?.teamId);
-  }
-
-  if (query.trim()) {
+  const filteredProjects = useMemo(() => {
+    if (!query.trim()) return projects;
     const normalizedQuery = query.toLowerCase();
-    projects = projects.filter((p) =>
-      p.name.toLowerCase().includes(normalizedQuery) ||
-      p.status.toLowerCase().includes(normalizedQuery)
+    return projects.filter(
+      (p) =>
+        p.name.toLowerCase().includes(normalizedQuery) ||
+        p.status.toLowerCase().includes(normalizedQuery),
     );
-  }
+  }, [projects, query]);
 
   if (projects.length === 0 && !query) {
     return <EmptyState title="No projects found" message="Create a project to start tracking team execution and business health." />;
@@ -82,13 +77,13 @@ export function ProjectsSection() {
         </div>
       </div>
 
-      {projects.length === 0 ? (
+      {filteredProjects.length === 0 ? (
         <EmptyState title="No matches found" message="Try adjusting your search criteria." />
       ) : view === "grid" ? (
-        <ProjectsGrid projects={projects} />
+        <ProjectsGrid projects={filteredProjects} users={users} />
       ) : (
         <div className="surface-card p-0 overflow-hidden">
-          <ProjectList projects={projects} teams={allTeams} users={allUsers} />
+          <ProjectList projects={filteredProjects} teams={teams} users={users} />
         </div>
       )}
     </div>

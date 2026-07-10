@@ -2,17 +2,47 @@
 
 import { useState } from "react";
 import { EmployeesTable } from "@/src/components/ui/employees-table";
-import { useAuthStore, useEmployeeStore, useTeamStore } from "@/src/store";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Modal } from "@/src/components/ui/modal";
-import { TeamsService } from "@/src/services/teams.service";
+import type { Team, User } from "@/src/types";
 
-export function EmployeesSection() {
-  const { currentUser } = useAuthStore();
-  const allUsers = useEmployeeStore((s) => s.getAllUsers());
-  const allTeams = useTeamStore((s) => s.getAllTeams());
+export interface CreateEmployeeInput {
+  name: string;
+  title: string;
+  email: string;
+  teamId: string;
+}
 
-  // Modal and Form States
+interface EmployeesSectionProps {
+  /** Employees already scoped to the current user's visibility by the page. */
+  employees: User[];
+  /** Teams the current user may assign employees to (all for admin, managed for manager). */
+  assignableTeams: Team[];
+  /** Whether the current user may view this directory at all. */
+  canView: boolean;
+  /** Whether the current user may delete employees. */
+  canDelete: boolean;
+  /** Whether the team select shows an "Unassigned" option (admin only). */
+  allowUnassignedTeam: boolean;
+  currentUserId: string;
+  onCreateEmployee: (input: CreateEmployeeInput) => void;
+  onDeleteEmployee: (userId: string) => void;
+}
+
+/**
+ * Pure presentational employee directory. Visibility scoping, permissions,
+ * and persistence are owned by the page (composition root).
+ */
+export function EmployeesSection({
+  employees,
+  assignableTeams,
+  canView,
+  canDelete,
+  allowUnassignedTeam,
+  currentUserId,
+  onCreateEmployee,
+  onDeleteEmployee,
+}: EmployeesSectionProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [name, setName] = useState("");
@@ -20,15 +50,7 @@ export function EmployeesSection() {
   const [email, setEmail] = useState("");
   const [teamId, setTeamId] = useState("");
 
-  if (!currentUser) return null;
-
-  const isAdmin = currentUser.role === "admin";
-  const isManager = currentUser.role === "manager";
-
-  // Access allowed for Admin and Manager
-  const isAuthorized = isAdmin || isManager;
-
-  if (!isAuthorized) {
+  if (!canView) {
     return (
       <EmptyState
         title="Access restricted"
@@ -37,30 +59,7 @@ export function EmployeesSection() {
     );
   }
 
-  // Filter teams led by this manager
-  const managedTeams = allTeams.filter((t) => t.leadId === currentUser.id);
-
-  // Filter visible employees
-  const visibleEmployees = isAdmin
-    ? allUsers
-    : allUsers.filter((u) => {
-        // Only show employees to managers
-        if (u.role !== "employee") return false;
-
-        // Share manager's teamId
-        if (u.teamId && u.teamId === currentUser.teamId) return true;
-
-        // Manager leads their team
-        const team = allTeams.find((t) => t.id === u.teamId);
-        if (team && team.leadId === currentUser.id) return true;
-
-        // Created by this manager
-        if (u.createdBy === currentUser.id) return true;
-
-        return false;
-      });
-
-  const filteredEmployees = visibleEmployees.filter((emp) => {
+  const filteredEmployees = employees.filter((emp) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -76,20 +75,13 @@ export function EmployeesSection() {
     e.preventDefault();
     if (!name.trim() || !title.trim()) return;
 
-    // Default teamId if manager is creating
-    const selectedTeamId = isManager
-      ? teamId || managedTeams[0]?.id || currentUser.teamId
-      : teamId;
-
-    TeamsService.createEmployee({
+    onCreateEmployee({
       name,
       title,
       email,
-      teamId: selectedTeamId,
-      createdById: currentUser.id,
+      teamId: teamId || assignableTeams[0]?.id || "",
     });
 
-    // Reset Form
     setName("");
     setTitle("");
     setEmail("");
@@ -111,11 +103,7 @@ export function EmployeesSection() {
         </div>
         <button
           onClick={() => {
-            if (isManager) {
-              setTeamId(managedTeams[0]?.id || currentUser.teamId || "");
-            } else if (allTeams.length > 0) {
-              setTeamId(allTeams[0].id);
-            }
+            setTeamId(allowUnassignedTeam ? "" : assignableTeams[0]?.id || "");
             setIsCreateOpen(true);
           }}
           className="primary-cta px-5 py-2 text-xs font-semibold hover:shadow-md transition active:scale-95 shrink-0"
@@ -147,7 +135,12 @@ export function EmployeesSection() {
           message="No employee profiles match your search criteria."
         />
       ) : (
-        <EmployeesTable users={filteredEmployees} />
+        <EmployeesTable
+          users={filteredEmployees}
+          canDelete={canDelete}
+          currentUserId={currentUserId}
+          onDelete={onDeleteEmployee}
+        />
       )}
 
       {/* Modal: Create Employee Profile */}
@@ -188,7 +181,7 @@ export function EmployeesSection() {
             />
           </div>
 
-          {isAdmin ? (
+          {(allowUnassignedTeam || assignableTeams.length > 1) && (
             <div>
               <label className="block text-xs font-semibold leading-5 text-slate-700 mb-1">Assign Team</label>
               <select
@@ -196,31 +189,14 @@ export function EmployeesSection() {
                 onChange={(e) => setTeamId(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none bg-white"
               >
-                <option value="">Unassigned</option>
-                {allTeams.map((t) => (
+                {allowUnassignedTeam && <option value="">Unassigned</option>}
+                {assignableTeams.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
                 ))}
               </select>
             </div>
-          ) : (
-            managedTeams.length > 1 && (
-              <div>
-                <label className="block text-xs font-semibold leading-5 text-slate-700 mb-1">Assign Team</label>
-                <select
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none bg-white"
-                >
-                  {managedTeams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )
           )}
 
           <div className="flex justify-end gap-2 pt-2">

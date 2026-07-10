@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useAuthStore, useEmployeeStore } from "@/src/store";
 import { Eye, Clock, Trash } from "iconsax-react";
 import type { User } from "@/src/types";
 
-export function EmployeesTable({ users }: { users: User[] }) {
-  const { currentUser } = useAuthStore();
-  const deleteUser = useEmployeeStore((s) => s.deleteUser);
+interface EmployeesTableProps {
+  users: User[];
+  /** Whether the current user may delete employees (computed by the page via permissions). */
+  canDelete?: boolean;
+  /** Current user's id — used to prevent self-deletion. */
+  currentUserId?: string;
+  /** Called when a delete is confirmed. Provided by the page (composition root). */
+  onDelete?: (userId: string) => void;
+}
 
-  const isAdmin = currentUser?.role === "admin";
+export function EmployeesTable({ users, canDelete = false, currentUserId, onDelete }: EmployeesTableProps) {
 
   const getAvatarBg = (name: string) => {
     const code = name.charCodeAt(0) + (name.charCodeAt(1) || 0);
@@ -26,7 +31,7 @@ export function EmployeesTable({ users }: { users: User[] }) {
 
   const handleDelete = (userId: string, userName: string) => {
     if (confirm(`Are you sure you want to delete employee profile for ${userName}?`)) {
-      deleteUser(userId);
+      onDelete?.(userId);
     }
   };
 
@@ -88,7 +93,7 @@ export function EmployeesTable({ users }: { users: User[] }) {
                       <Clock size={16} color="#475569" variant="Outline" />
                       History
                     </Link>
-                    {isAdmin && currentUser?.id !== user.id && (
+                    {canDelete && currentUserId !== user.id && (
                       <button
                         onClick={() => handleDelete(user.id, user.name)}
                         className="text-red-500 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer"

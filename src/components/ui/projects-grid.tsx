@@ -4,16 +4,13 @@ import Link from "next/link";
 import { CalendarTick } from "iconsax-react";
 import { ProjectStatusBadge } from "@/src/components/ui/badge";
 import { formatDate } from "@/src/lib/utils/format";
-import { useEmployeeStore } from "@/src/store";
-import type { Project } from "@/src/types";
+import type { Project, User } from "@/src/types";
 
-export function ProjectsGrid({ projects }: { projects: Project[] }) {
-  const getUsersByTeam = useEmployeeStore((s) => s.getUsersByTeam);
-
+export function ProjectsGrid({ projects, users }: { projects: Project[]; users: User[] }) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
       {projects.map((project) => {
-        const teamMembers = getUsersByTeam(project.teamId);
+        const teamMembers = users.filter((u) => u.teamId === project.teamId);
         const displayedMembers = teamMembers.slice(0, 3);
         const remainingCount = teamMembers.length - 3;
 

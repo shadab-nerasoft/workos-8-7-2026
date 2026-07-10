@@ -24,19 +24,19 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
 
   const navItems = useMemo(() => {
     const isEmployee = currentUser?.role === "employee";
+    // The /tasks page is role-aware: employees see their tasks,
+    // managers see their team's tasks, admins see all tasks.
+    const tasksLabel = isEmployee
+      ? "My Tasks"
+      : currentUser?.role === "manager"
+        ? "Team Tasks"
+        : "All Tasks";
+
     const items = [
       { href: "/", label: "Dashboard", icon: Element3 },
       { href: "/projects", label: "Projects", icon: TaskSquare },
-      { href: "/tasks", label: "My Tasks", icon: Kanban },
+      { href: "/tasks", label: tasksLabel, icon: Kanban },
     ];
-
-    if (!isEmployee) {
-      items.push({
-        href: "/team-tasks",
-        label: "Team Tasks",
-        icon: TaskSquare,
-      });
-    }
 
     if (isEmployee) {
       items.push(
@@ -48,22 +48,6 @@ export function NavLinks({ isCollapsed }: { isCollapsed?: boolean }) {
         { href: "/reports", label: "Team Reports", icon: CalendarTick },
         { href: "/employees", label: "Employees", icon: People },
       );
-
-      if (currentUser?.role === "manager") {
-        items.push({
-          href: "/manager-tasks",
-          label: "Team Tasks",
-          icon: TaskSquare,
-        });
-      }
-
-      if (currentUser?.role === "admin") {
-        items.push({
-          href: "/admin-tasks",
-          label: "All Tasks",
-          icon: TaskSquare,
-        });
-      }
     }
 
     items.push({ href: "/calendar", label: "Calendar", icon: CalendarTick });

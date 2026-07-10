@@ -17,7 +17,6 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown2, MessageText1, Paperclip2 } from "iconsax-react";
 import { PriorityBadge } from "@/src/components/ui/badge";
-import { useAuthStore, useTaskStore } from "@/src/store";
 import { formatDate, titleCase } from "@/src/lib/utils/format";
 import { getTaskManager } from "@/src/lib/utils/task-manager";
 import type { Task, TaskStatus, User } from "@/src/types";
@@ -35,10 +34,16 @@ export function KanbanBoard({
   tasks,
   users,
   onTaskSelect,
+  onTaskMove,
+  canDragTask,
 }: {
   tasks: Task[];
   users: User[];
   onTaskSelect?: (task: Task) => void;
+  /** Called when a task is moved to a new status. Provided by the page (composition root). */
+  onTaskMove?: (taskId: string, status: TaskStatus) => void;
+  /** Permission check for dragging a task, computed by the page. Defaults to allowing all. */
+  canDragTask?: (task: Task) => boolean;
 }) {
   const [items, setItems] = useState(tasks);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -59,9 +64,6 @@ export function KanbanBoard({
 
   const activeTask = activeId ? items.find((t) => t.id === activeId) : undefined;
 
-  const { currentUser } = useAuthStore();
-  const updateTaskStatus = useTaskStore((s) => s.moveTask);
-
   useEffect(() => {
     setItems(tasks);
   }, [tasks]);
@@ -69,11 +71,11 @@ export function KanbanBoard({
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const taskId = String(event.active.id);
     const task = items.find((t) => t.id === taskId);
-    if (currentUser?.role === "employee" && task?.assigneeId !== currentUser.id) {
+    if (task && canDragTask && !canDragTask(task)) {
       return;
     }
     setActiveId(taskId);
-  }, [items, currentUser]);
+  }, [items, canDragTask]);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event;
@@ -144,9 +146,9 @@ export function KanbanBoard({
     });
 
     if (finalStatus) {
-      updateTaskStatus(activeTaskId, finalStatus);
+      onTaskMove?.(activeTaskId, finalStatus);
     }
-  }, [updateTaskStatus]);
+  }, [onTaskMove]);
 
   return (
     <DndContext
@@ -163,7 +165,7 @@ export function KanbanBoard({
             status={group.status}
             tasks={group.tasks}
             usersById={usersById}
-            onStatusChange={updateTaskStatus}
+            onStatusChange={onTaskMove}
             onTaskSelect={onTaskSelect}
           />
         ))}
@@ -191,7 +193,7 @@ function KanbanColumn({
   status: TaskStatus;
   tasks: Task[];
   usersById: Map<string, User>;
-  onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onStatusChange?: (taskId: string, status: TaskStatus) => void;
   onTaskSelect?: (task: Task) => void;
 }) {
   return (
@@ -235,7 +237,7 @@ function TaskCard({
   task: Task;
   assignee?: User;
   manager?: User;
-  onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onStatusChange?: (taskId: string, status: TaskStatus) => void;
   onTaskSelect?: (task: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
