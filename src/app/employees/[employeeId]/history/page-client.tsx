@@ -51,10 +51,32 @@ export default function EmployeeHistoryPage({
   const unwrappedParams = use(params);
   const employeeId = unwrappedParams.employeeId;
 
-  const employee = useMemo(() => useEmployeeStore.getState().getUserById(employeeId), [employeeId]);
-  const employeeReports = useMemo(() => useDailyReportStore.getState().getReportsByEmployeeId(employeeId), [employeeId]);
+  // Reactive selectors — getState() in useMemo would never update after
+  // the stores hydrate client-side.
+  const usersList = useEmployeeStore((s) => s.usersList);
+  const reportsList = useDailyReportStore((s) => s.reportsList);
+
+  const employee = useMemo(
+    () => usersList.find((u) => u.id === employeeId),
+    [usersList, employeeId],
+  );
+  const employeeReports = useMemo(
+    () => reportsList.filter((r) => r.employeeId === employeeId),
+    [reportsList, employeeId],
+  );
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
+
+  // Stores hydrate client-side; empty usersList means loading, not a 404.
+  if (usersList.length === 0) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[50vh] items-center justify-center p-6">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary-500" aria-label="Loading history" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!employee) {
     notFound();

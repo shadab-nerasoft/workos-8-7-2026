@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, use } from "react";
-import { notFound } from "next/navigation";
 import { Add } from "iconsax-react";
 import { AppShell } from "@/src/components/common/app-shell";
 import { ProjectBoardTab } from "@/src/components/projects/project-board-tab";
@@ -113,8 +112,30 @@ export default function ProjectDetailPage({
     setIsTaskModalOpen(true);
   };
 
+  // Stores hydrate in a client-side effect, so projectsList is empty during
+  // SSR and the first client render. Treat that as loading — only report
+  // "not found" once data actually exists.
+  if (projectsList.length === 0) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[50vh] items-center justify-center p-6">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary-500" aria-label="Loading project" />
+        </div>
+      </AppShell>
+    );
+  }
+
   if (!project) {
-    notFound();
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] p-6">
+          <EmptyState
+            title="Project not found"
+            message="This project does not exist or may have been removed."
+          />
+        </div>
+      </AppShell>
+    );
   }
 
   // Block employees not assigned to any tasks in this project

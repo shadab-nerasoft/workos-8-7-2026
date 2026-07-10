@@ -18,9 +18,23 @@ export default function EmployeeDetailPage({
   const unwrappedParams = use(params);
   const employeeId = unwrappedParams.employeeId;
 
-  const employee = useEmployeeStore((s) => s.getUserById(employeeId));
-  const allTasks = useTaskStore((s) => s.getAllTasks());
-  const projects = useProjectStore((s) => s.getAllProjects());
+  const usersList = useEmployeeStore((s) => s.usersList);
+  const allTasks = useTaskStore((s) => s.tasks);
+  const projects = useProjectStore((s) => s.projectsList);
+
+  const employee = usersList.find((u) => u.id === employeeId);
+
+  // Stores hydrate client-side, so usersList is empty during SSR and the
+  // first render. Treat that as loading rather than a 404.
+  if (usersList.length === 0) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[50vh] items-center justify-center p-6">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary-500" aria-label="Loading employee" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!employee) {
     notFound();
